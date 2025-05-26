@@ -501,37 +501,30 @@ function fetchWorldsList() {
 connectToWebSocket();
 
 /**
- * Toggle visibility of collapsible card sections
- * @param {string} cardId - The ID of the card content section to toggle
- */
-function toggleCard(cardId) {
-  const content = document.getElementById(cardId);
-  const header = content.previousElementSibling;
-  const icon = header.querySelector('.collapse-icon');
-
-  if (content.style.display === 'none' || !content.style.display) {
-    content.style.display = 'block';
-    icon.textContent = '▼';
-  } else {
-    content.style.display = 'none';
-    icon.textContent = '►';
-  }
-}
-
-/**
  * Toggle the console panel visibility
  */
 function toggleConsole() {
   const consoleSection = document.querySelector('.console-section');
-  consoleSection.classList.toggle('show');
-
   const toggleButton = document.querySelector('.toggle-console');
   const icon = toggleButton.querySelector('.icon');
-
-  if (consoleSection.classList.contains('show')) {
-    icon.textContent = '▲';
-  } else {
+  
+  // Toggle visibility
+  if (consoleSection.style.display === 'block') {
+    consoleSection.style.display = 'none';
+    toggleButton.classList.remove('expanded');
     icon.textContent = '▼';
+  } else {
+    consoleSection.style.display = 'block';
+    toggleButton.classList.add('expanded');
+    icon.textContent = '▲';
+    
+    // Auto-focus the input field when opening console
+    setTimeout(() => {
+      const commandInput = document.getElementById('command-input');
+      if (commandInput) {
+        commandInput.focus();
+      }
+    }, 100);
   }
 }
 
@@ -540,17 +533,21 @@ function toggleConsole() {
  */
 function toggleConfig() {
   const configSection = document.querySelector('.config-section');
-  configSection.classList.toggle('show');
-
   const toggleButton = document.querySelector('button:nth-child(2)');
   const icon = toggleButton.querySelector('.icon');
-
-  if (configSection.classList.contains('show')) {
+  
+  // Toggle visibility
+  if (configSection.style.display === 'block') {
+    configSection.style.display = 'none';
+    toggleButton.classList.remove('expanded');
+    icon.textContent = '▼';
+  } else {
+    configSection.style.display = 'block';
+    toggleButton.classList.add('expanded');
     icon.textContent = '▲';
+    
     // Fetch config when opening the editor
     sendCommand(JSON.stringify({ command: 'get_config' }));
-  } else {
-    icon.textContent = '▼';
   }
 }
 
