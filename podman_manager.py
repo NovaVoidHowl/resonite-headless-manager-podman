@@ -5,17 +5,9 @@ from threading import Lock
 import logging
 import threading
 import podman
-import requests
-import json
-import urllib.parse
 import os
-
-# Try to import requests_unixsocket for Unix socket communication
-try:
-    import requests_unixsocket
-    HAS_UNIXSOCKET_SUPPORT = True
-except ImportError:
-    HAS_UNIXSOCKET_SUPPORT = False
+import subprocess
+import tempfile
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -31,14 +23,12 @@ class PodmanManager:
     self.ansi_escape = re.compile(r'(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]|\x1B[()][AB012]')
     self._monitor_running = False
     self.client = None
-    self.api_base_url = None
-    self.container_id = None
 
     # Initialize podman client
     self._init_client()
 
   def _init_client(self):
-    """Initialize the podman client and get API base URL"""
+    """Initialize the podman client"""
     connection_error = None
 
     # URI schemes according to Podman Python API docs
@@ -56,10 +46,6 @@ class PodmanManager:
 
         self.client = podman.PodmanClient(base_url=method["uri"])
 
-        # Extract API base URL for direct REST calls
-        self.api_base_url = self._get_api_url_from_uri(method["uri"])
-        logger.info("Direct API base URL: %s", self.api_base_url)
-
         # Test connection with ping and get container
         logger.info("Testing connection to %s", method['uri'])
         self.client.ping()
@@ -67,7 +53,6 @@ class PodmanManager:
 
         # Check if container exists and is accessible
         container = self.client.containers.get(self.container_name)
-        self.container_id = container.id  # Store container ID for API calls
         logger.info("Container found: %s (ID: %s)", container.name, container.id)
         logger.info("Container status: %s", container.status)
 
@@ -83,37 +68,6 @@ class PodmanManager:
 
     # Set a default client so the app doesn't crash completely
     self.client = podman.PodmanClient(base_url="http+unix:///run/podman/podman.sock")
-    self.api_base_url = "http+unix:///run/podman/podman.sock"
-
-  def _get_api_url_from_uri(self, uri):
-    """Convert Podman client URI to direct API URL"""
-    if uri.startswith("http+unix://"):
-      # For unix sockets, we need special handling
-      socket_path = uri.replace("http+unix://", "")
-      socket_path = urllib.parse.quote_plus(socket_path)
-      return f"http://localhost/v4.0.0"  # We'll handle the socket connection separately
-    elif uri.startswith("tcp://"):
-      # For TCP connections, we can use the URI directly
-      return uri.replace("tcp://", "http://") + "/v4.0.0"
-    return uri + "/v4.0.0"  # Default fallback
-
-  def _create_api_session(self):
-    """Create a requests session configured for the proper API endpoint"""
-    session = requests.Session()
-    if self.api_base_url.startswith("http://localhost/"):
-      # For Unix socket connections
-      socket_path = None
-      for uri in ["/run/podman/podman.sock", "/run/user/0/podman/podman.sock"]:
-        if os.path.exists(uri):
-          socket_path = uri
-          break
-
-      if not socket_path:
-        raise ValueError("Could not find Podman socket file")
-
-      session.mount("http://localhost/", requests_unixsocket.UnixAdapter(socket_path))
-
-    return session
 
   def clean_output(self, text):
     """Clean and format output text by removing ANSI sequences and handling line breaks"""
@@ -134,179 +88,121 @@ class PodmanManager:
     with self.buffer_lock:
       return list(self.output_buffer)[-count:]
 
-  def send_command(self, command, timeout=5):
-    """Send a command to the container's console using the Podman API"""
+  def send_command(self, command, timeout=10):
+    """
+    Send a command to the container's console using Python's subprocess
+    with a properly constructed expect-like interaction
+    """
     logger.info("Sending command to container: %s", command)
 
     try:
-      # Get container instance to verify it exists
+      # Verify the container exists and is running
       container = self.client.containers.get(self.container_name)
       logger.info("Container verified: %s", container.name)
 
-      # Try the direct API approach
+      # Create a temporary file to store the command
+      with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as cmd_file:
+        cmd_path = cmd_file.name
+        cmd_file.write(command)
+
+      # Create a temporary file to store the output
+      output_path = os.path.join(os.path.dirname(cmd_path), f"output_{os.getpid()}.txt")
+
       try:
-        # First test if we have requests_unixsocket for Unix socket connections
-        if not HAS_UNIXSOCKET_SUPPORT:
-          logger.warning("Missing requests_unixsocket package for direct socket API calls")
-          logger.warning("Falling back to tty=True approach")
+        # Execute podman attach in a separate process that we can control
+        # We use 'script' to capture the full terminal output including control sequences
+        attach_cmd = [
+          "script", "-q", output_path, "-c",
+          f"podman attach --detach-keys='ctrl-d' {self.container_name}"
+        ]
 
-        if HAS_UNIXSOCKET_SUPPORT and self.container_id:
-          # Try using direct API call to attach to the container
-          logger.info("Using direct Podman REST API to attach to container")
+        logger.info(f"Starting podman attach process with command: {' '.join(attach_cmd)}")
 
-          # Create a session for API calls
-          session = self._create_api_session()
-
-          # First check if the container has a TTY allocated
-          inspect_url = f"{self.api_base_url}/libpod/containers/{self.container_id}/json"
-          inspect_response = session.get(inspect_url)
-
-          if inspect_response.status_code == 200:
-            container_info = inspect_response.json()
-            has_tty = container_info.get("Config", {}).get("Tty", False)
-            logger.info("Container has TTY: %s", has_tty)
-
-            if has_tty:
-              # Container has a TTY, we can use the attach endpoint
-              attach_url = f"{self.api_base_url}/libpod/containers/{self.container_id}/attach"
-
-              # Send the command with a newline to the container's stdin
-              full_command = f"{command}\n"
-
-              # Make the API call to attach to the container
-              attach_response = session.post(
-                attach_url,
-                params={
-                  "stdin": "true",
-                  "stdout": "true",
-                  "stderr": "true",
-                  "logs": "false",
-                  "stream": "true"
-                },
-                data=full_command,
-                stream=True,
-                headers={"Content-Type": "text/plain"}
-              )
-
-              if attach_response.status_code == 200:
-                logger.info("Successfully attached to container and sent command")
-                # Process the response stream
-                output_buffer = []
-                for chunk in attach_response.iter_content(chunk_size=1024):
-                  if chunk:
-                    output_buffer.append(chunk.decode('utf-8'))
-
-                output = ''.join(output_buffer)
-                logger.info("Received %d bytes of output from attach", len(output))
-                return output
-              else:
-                logger.warning("Failed to attach to container API: %s", attach_response.text)
-
-        # If direct API approach failed or missing requests_unixsocket, fall back
-        logger.info("Direct API approach failed or not available, falling back to tty=True approach")
-
-      except Exception as api_error:
-        logger.warning("Error with direct API approach: %s", str(api_error))
-        logger.info("Falling back to tty=True approach")
-
-      # Fall back to tty=True approach
-      # Create a command to send to the container's console
-      stdin_cmd = ["bash", "-c", f"echo '{command}\\n' > /dev/tty"]
-      logger.info("Using exec_run with tty=True and command: %s", stdin_cmd)
-
-      # Execute with tty=True to allocate a pseudo-TTY
-      result = container.exec_run(
-        cmd=stdin_cmd,
-        stdout=True,
-        stderr=True,
-        tty=True  # This is key for proper terminal interaction
-      )
-
-      # Check if the command was sent successfully
-      if isinstance(result, tuple) and len(result) >= 2:
-        exit_code, output = result
-        logger.info("exec_run returned exit_code: %s", exit_code)
-
-        if exit_code != 0:
-          logger.error("Error sending command to container: %r",
-                       output.decode('utf-8').strip() if isinstance(output, bytes) else output)
-          return f"Error sending command: {output.decode('utf-8').strip() if isinstance(output, bytes) else output}"
-
-      # Wait for the command to be processed
-      time.sleep(1.5)
-
-      # Now get the logs to capture the output
-      try:
-        # Get the recent logs
-        logs = container.logs(
-          stdout=True,
-          stderr=True,
-          tail=100,  # Get enough lines to capture the full response
-          timestamps=False
+        # Start the process
+        process = subprocess.Popen(
+          attach_cmd,
+          stdin=subprocess.PIPE,
+          stdout=subprocess.PIPE,
+          stderr=subprocess.PIPE,
+          text=True
         )
 
-        if isinstance(logs, bytes):
-          logs_text = logs.decode('utf-8')
-        else:
-          logs_text = str(logs)
+        # Wait a moment for the container console to initialize
+        time.sleep(1)
 
-        # Process the logs to extract the command response
-        clean_lines = self.clean_output(logs_text)
-        logger.debug("Raw log lines: %r", clean_lines)
+        # Send the command followed by a newline
+        logger.info(f"Sending command to container console: {command}")
+        process.stdin.write(f"{command}\n")
+        process.stdin.flush()
 
-        # Look for the most recent occurrence of our command
-        output_lines = []
-        command_index = -1
+        # Wait for command to be processed
+        time.sleep(2)
 
-        # Find the last occurrence of our command
-        for i in range(len(clean_lines) - 1, -1, -1):
-          if clean_lines[i].strip() == command.strip():
-            command_index = i
+        # Send Ctrl+D (ASCII value 4) to detach
+        logger.info("Sending Ctrl+D to detach from console")
+        process.stdin.write("\x04")
+        process.stdin.flush()
+
+        # Wait for the process to complete
+        try:
+          process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+          logger.warning(f"Process timed out after {timeout} seconds, sending SIGTERM")
+          process.terminate()
+          try:
+            process.wait(timeout=2)
+          except subprocess.TimeoutExpired:
+            logger.warning("Termination timed out, sending SIGKILL")
+            process.kill()
+
+        # Read the output file
+        logger.info(f"Reading output from {output_path}")
+        with open(output_path, 'r') as output_file:
+          output = output_file.read()
+
+        # Process and parse the output
+        clean_lines = self.clean_output(output)
+        logger.info(f"Captured {len(clean_lines)} lines of output")
+
+        # Extract the command response
+        response_lines = []
+        capture_started = False
+
+        for line in clean_lines:
+          # Skip lines until we find our command
+          if not capture_started:
+            if command.strip() in line:
+              capture_started = True
+              continue
+          # If we've started capturing and hit a prompt, stop
+          elif '>' in line:
             break
+          # Otherwise add the line to our response
+          elif capture_started:
+            response_lines.append(line)
 
-        if command_index != -1 and command_index < len(clean_lines) - 1:
-          # Start collecting lines after the command
-          start_collect = command_index + 1
-          end_collect = len(clean_lines)
-
-          # Find where the output ends (next prompt or empty line)
-          for i in range(start_collect, len(clean_lines)):
-            if '>' in clean_lines[i] or clean_lines[i].strip() == '':
-              end_collect = i
-              break
-
-          # Collect the output lines
-          output_lines = clean_lines[start_collect:end_collect]
-
-        # If we still don't have output, try a different approach
-        if not output_lines:
-          # Try to find output based on proximity to the command
-          for i in range(len(clean_lines)):
-            if clean_lines[i].strip() and command.strip().lower() in clean_lines[i].strip().lower():
-              # Found something that might be our command, check what follows
-              j = i + 1
-              while j < len(clean_lines) and not ('>' in clean_lines[j] or clean_lines[j].strip() == ''):
-                output_lines.append(clean_lines[j])
-                j += 1
-              if output_lines:  # If we found some output, stop looking
-                break
-
-        # Log status of output parsing
-        if output_lines:
-          logger.info("Parsed %d output lines for command '%s'", len(output_lines), command)
+        if response_lines:
+          logger.info(f"Found {len(response_lines)} response lines")
+          response = '\n'.join(response_lines)
         else:
-          logger.warning("No output lines found for command '%s'", command)
+          logger.warning("No response lines found")
+          response = ""
 
-        output = '\n'.join(output_lines)
-        return output
+        return response
 
-      except Exception as log_error:
-        logger.error("Error retrieving command output: %s", str(log_error))
-        return "Command sent, but could not retrieve output"
+      finally:
+        # Clean up temporary files
+        try:
+          if os.path.exists(cmd_path):
+            os.unlink(cmd_path)
+          if os.path.exists(output_path):
+            os.unlink(output_path)
+        except Exception as e:
+          logger.warning(f"Error cleaning up temporary files: {e}")
 
     except Exception as e:
       error_msg = str(e).strip() or "Unknown error"
-      logger.error("Error sending command to container: %s", error_msg)
+      logger.error(f"Error sending command to container: {error_msg}")
       return f"Error: {error_msg}"
 
   def monitor_output(self, callback):
