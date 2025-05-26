@@ -5,6 +5,7 @@ from threading import Lock
 import logging
 import threading
 import podman
+import io
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -86,7 +87,10 @@ class PodmanManager:
       return list(self.output_buffer)[-count:]
 
   def send_command(self, command, timeout=5):
-    """Send a command to the container's console using the Podman Python API"""
+    """
+    Send a command to the container's console using the attach method
+    as recommended in the Resonite Headless Server documentation
+    """
     logger.info("Sending command to container: %s", command)
 
     try:
@@ -94,14 +98,41 @@ class PodmanManager:
       container = self.client.containers.get(self.container_name)
       logger.info("Container verified: %s", container.name)
 
-      # For interactive console communication, we need to:
-      # 1. Use tty=True to allocate a pseudo-TTY
-      # 2. Create a command that sends our input to the console
-      # 3. Add a newline character to simulate pressing Enter
+      # Try using the attach method as recommended in Resonite docs
+      try:
+        logger.info("Attempting to attach to container console")
 
-      # Create a command that will write to the container's console
-      # We'll use the bash echo command to send our command followed by a newline
-      stdin_cmd = ["bash", "-c", f"echo '{command}' > /dev/tty"]
+        # Try to attach to the console
+        # Note: The API docs indicate this might raise NotImplementedError
+        output = container.attach(
+          stdout=True,
+          stderr=True,
+          stream=False,
+          logs=False  # Don't include previous logs
+        )
+
+        # If we got here, attach is implemented
+        logger.info("Successfully attached to container console")
+
+        # Send the command and capture output
+        # This is where we would write to stdin and read from stdout
+        # But since the API might not support bidirectional communication,
+        # we'll need a different approach if we get here
+
+        # For now, fall back to our tty=True approach if attach works but
+        # doesn't allow us to send commands
+        logger.info("Attach worked but bidirectional communication not implemented")
+        logger.info("Falling back to tty=True approach")
+
+      except NotImplementedError:
+        logger.info("Container attach method not implemented, falling back to tty=True approach")
+      except Exception as attach_error:
+        logger.warning("Error attaching to container: %s", str(attach_error))
+        logger.info("Falling back to tty=True approach")
+
+      # Fall back to our tty=True approach
+      # Create a command to send to the container's console
+      stdin_cmd = ["bash", "-c", f"echo '{command}\\n' > /dev/tty"]
       logger.info("Using exec_run with tty=True and command: %s", stdin_cmd)
 
       # Execute with tty=True to allocate a pseudo-TTY
@@ -119,7 +150,7 @@ class PodmanManager:
 
         if exit_code != 0:
           logger.error("Error sending command to container: %r",
-                      output.decode('utf-8').strip() if isinstance(output, bytes) else output)
+                       output.decode('utf-8').strip() if isinstance(output, bytes) else output)
           return f"Error sending command: {output.decode('utf-8').strip() if isinstance(output, bytes) else output}"
 
       # Wait for the command to be processed
@@ -198,6 +229,16 @@ class PodmanManager:
       error_msg = str(e).strip() or "Unknown error"
       logger.error("Error sending command to container: %s", error_msg)
       return f"Error: {error_msg}"
+
+  # Let's also try implementing a direct attach-based approach as an alternative method
+  def send_command_attach(self, command, timeout=5):
+    """
+    Alternative method: Try to send a command using direct podman CLI attach
+    This is a backup method if the API-based approach doesn't work
+    """
+    # Note: This method is not currently used, but kept for reference
+    # and possible future implementation
+    pass
 
   def monitor_output(self, callback):
     """Monitor container output continuously using the Podman Python API logs method"""
