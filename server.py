@@ -240,51 +240,105 @@ async def get_world_users(world_index: int) -> list:
 
 async def get_world_data(world_line: str, index: int) -> dict:
   """Parse world data and get its details"""
-  podman_manager.send_command(f"focus {index}")
-  time.sleep(1)
+  logger.info(f"Processing world line: {world_line}")
 
-  status_output = podman_manager.send_command("status")
-  status_lines = status_output.split('\n')[1:-1]
+  # Handle the [index] prefix if present
+  if world_line.startswith('['):
+    bracket_end = world_line.find(']')
+    if bracket_end != -1:
+      world_line = world_line[bracket_end + 1:].strip()
 
-  status_data = {}
-  for line in status_lines:
-    if ': ' in line:
-      key, value = line.split(': ', 1)
-      status_data[key] = value
+  # Split on "Users:" to get the name and details
+  parts = world_line.split("Users:", 1)
+  if len(parts) != 2:
+    logger.warning(f"Invalid world line format (missing Users:): {world_line}")
+    return None
 
-  parts = world_line.split('\t')
-  name_part = parts[0]
-  users_index = name_part.find("Users:")
-  name = name_part[name_part.find(']') + 2:users_index].strip()
+  name = parts[0].strip()
 
-  world_data = {
-    "name": name,
-    "sessionId": status_data.get("SessionID", ""),
-    "users": int(status_data.get("Current Users", 0)),
-    "present": int(status_data.get("Present Users", 0)),
-    "maxUsers": int(status_data.get("Max Users", 0)),
-    "uptime": format_uptime(status_data.get("Uptime", "")),
-    "accessLevel": status_data.get("Access Level", ""),
-    "hidden": status_data.get("Hidden from listing", "False") == "True",
-    "mobileFriendly": status_data.get("Mobile Friendly", "False") == "True",
-    "description": status_data.get("Description", ""),
-    "tags": status_data.get("Tags", "")
-  }
+  # Parse the details section using space as delimiter
+  details = parts[1].strip().split()
+  if len(details) < 6:  # We expect at least 6 parts: Users count, "Present:", present count, "AccessLevel:", access level, max users
+    logger.warning(f"Invalid details format in world line: {parts[1]}")
+    return None
 
-  world_data["users_list"] = await get_world_users(index)
-  return world_data
+  try:
+    # Extract values using the known format
+    user_count = int(details[0])
+    present_count = int(details[2])
+    access_level = details[4]
+    max_users = int(details[6]) if len(details) > 6 else 32
+
+    # Get detailed status
+    podman_manager.send_command(f"focus {index}")
+    time.sleep(0.5)  # Wait for focus to take effect
+
+    status_output = podman_manager.send_command("status")
+    status_lines = status_output.split('\n')
+
+    # Filter out empty lines and command prompts
+    status_lines = [line.strip() for line in status_lines if line.strip() and not line.endswith('>')]
+
+    # Parse status data
+    status_data = {}
+    for line in status_lines:
+      if ': ' in line:
+        key, value = line.split(': ', 1)
+        status_data[key.strip()] = value.strip()
+
+    # Build world data object
+    world_data = {
+      "name": name,
+      "sessionId": status_data.get("SessionID", ""),
+      "users": user_count,
+      "present": present_count,
+      "maxUsers": max_users,
+      "uptime": format_uptime(status_data.get("Uptime", "")),
+      "accessLevel": access_level,
+      "hidden": status_data.get("Hidden from listing", "False") == "True",
+      "mobileFriendly": status_data.get("Mobile Friendly", "False") == "True",
+      "description": status_data.get("Description", ""),
+      "tags": status_data.get("Tags", "")
+    }
+
+    # Get users list
+    world_data["users_list"] = await get_world_users(index)
+
+    logger.info(f"Successfully parsed world data for {name}")
+    return world_data
+
+  except Exception as e:
+    logger.error(f"Error parsing world data: {str(e)}")
+    return None
 
 
 async def handle_worlds(websocket: WebSocket):
   """Handle worlds request and data collection"""
   worlds_output = podman_manager.send_command("worlds")
-  worlds_output = worlds_output.split('\n')[1:-1]
+  worlds_output_lines = worlds_output.split('\n')
+
+  # Filter out empty lines and command prompt
+  worlds_lines = [line for line in worlds_output_lines if line.strip() and not line.endswith('>')]
+
+  # Skip the first line if it's just column headers
+  if len(worlds_lines) > 0 and not worlds_lines[0].strip().startswith('['):
+      worlds_lines = worlds_lines[1:]
+
+  logger.info(f"Found {len(worlds_lines)} world(s) to process")
 
   worlds = []
-  for i, world in enumerate(worlds_output):
-    world_data = await get_world_data(world, i)
-    worlds.append(world_data)
+  for i, world in enumerate(worlds_lines):
+    try:
+      world_data = await get_world_data(world, i)
+      if world_data:
+        worlds.append(world_data)
+        logger.info(f"Successfully processed world: {world_data['name']}")
+      else:
+        logger.warning(f"Failed to process world line: {world}")
+    except Exception as e:
+      logger.error(f"Error processing world {i}: {str(e)}")
 
+  logger.info(f"Sending {len(worlds)} world(s) to client")
   await websocket.send_json({
     "type": "worlds_update",
     "output": worlds
