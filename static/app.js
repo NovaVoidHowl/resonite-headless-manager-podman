@@ -541,17 +541,30 @@ function toggleConsole() {
 function toggleConfig() {
   const configSection = document.querySelector('.config-section');
   const toggleButton = document.querySelector('button:nth-child(2)');
-  const icon = toggleButton.querySelector('.icon');
-
+  
   // Toggle visibility
   if (configSection.style.display === 'block') {
     configSection.style.display = 'none';
-    toggleButton.classList.remove('expanded');
-    icon.textContent = '▼';
+    if (toggleButton) {
+      toggleButton.classList.remove('expanded');
+      
+      // Find the icon safely
+      const icon = toggleButton.querySelector('.icon');
+      if (icon) {
+        icon.textContent = '▼';
+      }
+    }
   } else {
     configSection.style.display = 'block';
-    toggleButton.classList.add('expanded');
-    icon.textContent = '▲';
+    if (toggleButton) {
+      toggleButton.classList.add('expanded');
+      
+      // Find the icon safely
+      const icon = toggleButton.querySelector('.icon');
+      if (icon) {
+        icon.textContent = '▲';
+      }
+    }
 
     // Fetch config when opening the editor
     sendCommand(JSON.stringify({ command: 'get_config' }));
