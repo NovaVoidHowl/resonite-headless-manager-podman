@@ -94,44 +94,44 @@ class PodmanManager:
       container = self.client.containers.get(self.container_name)
       logger.info("Container verified: %s", container.name)
 
-      # For Resonite Headless container, we need to interact with its console by
-      # sending commands to stdin of the main process
+      # For interactive console communication, we need to:
+      # 1. Use tty=True to allocate a pseudo-TTY
+      # 2. Create a command that sends our input to the console
+      # 3. Add a newline character to simulate pressing Enter
 
-      # Create a command that writes to the stdin of PID 1 (the main process)
-      # The echo command sends our command string followed by a newline to stdin
-      # Add -e flag to echo to interpret backslash escapes like \n (newline)
-      stdin_cmd = f"echo -e '{command}\\n' > /proc/1/fd/0"
+      # Create a command that will write to the container's console
+      # We'll use the bash echo command to send our command followed by a newline
+      stdin_cmd = ["bash", "-c", f"echo '{command}' > /dev/tty"]
+      logger.info("Using exec_run with tty=True and command: %s", stdin_cmd)
 
-      logger.info("Executing stdin command via exec_run")
-
-      # Use exec_run with the appropriate parameters to send the command
+      # Execute with tty=True to allocate a pseudo-TTY
       result = container.exec_run(
-        cmd=["bash", "-c", stdin_cmd],
+        cmd=stdin_cmd,
         stdout=True,
-        stderr=True
+        stderr=True,
+        tty=True  # This is key for proper terminal interaction
       )
 
-      # Process the result
+      # Check if the command was sent successfully
       if isinstance(result, tuple) and len(result) >= 2:
         exit_code, output = result
-        logger.info("stdin command execution returned exit_code: %s", exit_code)
+        logger.info("exec_run returned exit_code: %s", exit_code)
 
         if exit_code != 0:
-          logger.error("Failed to send command to container stdin: %r",
-                       output.decode('utf-8').strip() if isinstance(output, bytes) else output)
+          logger.error("Error sending command to container: %r",
+                      output.decode('utf-8').strip() if isinstance(output, bytes) else output)
           return f"Error sending command: {output.decode('utf-8').strip() if isinstance(output, bytes) else output}"
 
-      # Since the command is sent asynchronously to the container's console,
-      # we need to wait a moment for it to process and then fetch the output
-      time.sleep(1.0)  # Give the container more time to process the command and generate output
+      # Wait for the command to be processed
+      time.sleep(1.5)
 
-      # Now get the recent logs to capture the output
+      # Now get the logs to capture the output
       try:
-        # Get the last several lines from the container logs
+        # Get the recent logs
         logs = container.logs(
           stdout=True,
           stderr=True,
-          tail=50,  # Get more lines to ensure we capture the full response
+          tail=100,  # Get enough lines to capture the full response
           timestamps=False
         )
 
@@ -140,7 +140,7 @@ class PodmanManager:
         else:
           logs_text = str(logs)
 
-        # Clean up the logs and extract relevant output
+        # Process the logs to extract the command response
         clean_lines = self.clean_output(logs_text)
         logger.debug("Raw log lines: %r", clean_lines)
 
@@ -150,34 +150,44 @@ class PodmanManager:
 
         # Find the last occurrence of our command
         for i in range(len(clean_lines) - 1, -1, -1):
-            if clean_lines[i].lower().strip() == command.lower().strip():
-                command_index = i
-                break
+          if clean_lines[i].strip() == command.strip():
+            command_index = i
+            break
 
         if command_index != -1 and command_index < len(clean_lines) - 1:
-            # Start collecting lines after the command
-            start_collect = command_index + 1
-            end_collect = len(clean_lines)
+          # Start collecting lines after the command
+          start_collect = command_index + 1
+          end_collect = len(clean_lines)
 
-            # Find where the output ends (next prompt or empty line)
-            for i in range(start_collect, len(clean_lines)):
-                if clean_lines[i].endswith('>') or clean_lines[i].strip() == '':
-                    end_collect = i
-                    break
+          # Find where the output ends (next prompt or empty line)
+          for i in range(start_collect, len(clean_lines)):
+            if '>' in clean_lines[i] or clean_lines[i].strip() == '':
+              end_collect = i
+              break
 
-            # Collect the output lines
-            output_lines = clean_lines[start_collect:end_collect]
+          # Collect the output lines
+          output_lines = clean_lines[start_collect:end_collect]
 
-        # If we still don't have output, try a simpler approach
+        # If we still don't have output, try a different approach
         if not output_lines:
-            # Get all lines that don't look like commands or prompts
-            for line in clean_lines:
-                if not line.endswith('>') and line.strip() != command.strip():
-                    # This might be output content
-                    output_lines.append(line)
+          # Try to find output based on proximity to the command
+          for i in range(len(clean_lines)):
+            if clean_lines[i].strip() and command.strip().lower() in clean_lines[i].strip().lower():
+              # Found something that might be our command, check what follows
+              j = i + 1
+              while j < len(clean_lines) and not ('>' in clean_lines[j] or clean_lines[j].strip() == ''):
+                output_lines.append(clean_lines[j])
+                j += 1
+              if output_lines:  # If we found some output, stop looking
+                break
+
+        # Log status of output parsing
+        if output_lines:
+          logger.info("Parsed %d output lines for command '%s'", len(output_lines), command)
+        else:
+          logger.warning("No output lines found for command '%s'", command)
 
         output = '\n'.join(output_lines)
-        logger.info("Command output: %s", output)
         return output
 
       except Exception as log_error:
