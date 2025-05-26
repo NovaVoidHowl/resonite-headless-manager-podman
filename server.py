@@ -11,7 +11,6 @@ import psutil  # Add this import
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from podman_manager import PodmanManager
 
@@ -22,9 +21,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-
-# Serve static files (if you have any CSS/JS files)
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Store active WebSocket connections
 active_connections = []

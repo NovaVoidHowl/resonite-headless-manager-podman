@@ -1,8 +1,6 @@
-podman
 fastapi
-uvicorn[standard]
-asyncio
+uvicorn
 python-dotenv
 psutil
+podman-py
 requests
-requests-unixsocket

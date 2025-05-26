@@ -33,4 +33,8 @@ source Res-Manager/bin/activate
 
 pip install -r requirements.txt
 
+# Start the static web server in the background
+python webserver.py &
+
+# Start the WebSocket server
 python server.py

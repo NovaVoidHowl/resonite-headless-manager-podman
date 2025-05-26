@@ -20,7 +20,10 @@ const AVAILABLE_ROLES = [
 ];
 
 function connect() {
-  ws = new WebSocket(`ws://${window.location.host}/ws`);
+  // Use port 8000 for WebSocket connections
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsHost = window.location.hostname;
+  ws = new WebSocket(`${wsProtocol}//${wsHost}:8000/ws`);
 
   ws.onopen = function () {
     const statusDiv = document.getElementById('status');
