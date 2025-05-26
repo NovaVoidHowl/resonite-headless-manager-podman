@@ -31,6 +31,7 @@ active_connections = []
 # Initialize PodmanManager with container name from .env
 podman_manager = PodmanManager(os.getenv('CONTAINER_NAME', 'resonite-headless'))  # Fallback to 'resonite-headless' if not set
 
+
 # Add config file handling
 def load_config() -> Dict[Any, Any]:
     """Load the headless config file"""
@@ -54,6 +55,7 @@ def load_config() -> Dict[Any, Any]:
         logger.error(f"Unexpected error loading config: {str(e)}")
         raise ValueError(f"Error loading config: {str(e)}")
 
+
 def save_config(config_data: Dict[Any, Any]) -> None:
     """Save the headless config file"""
     config_path = os.getenv('CONFIG_PATH')
@@ -69,6 +71,7 @@ def save_config(config_data: Dict[Any, Any]) -> None:
 
     with open(config_path, 'w') as f:
         json.dump(config_data, f, indent=2)
+
 
 def format_uptime(uptime_str):
     """Convert .NET TimeSpan format to human readable format"""
@@ -103,6 +106,7 @@ def format_uptime(uptime_str):
     except:
         return uptime_str
 
+
 def parse_bans(output):
     """Parse the ban list output into structured data"""
     bans = []
@@ -122,10 +126,12 @@ def parse_bans(output):
                 })
     return bans
 
+
 @app.get("/")
 async def get():
     with open("templates/index.html") as f:
         return HTMLResponse(f.read())
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -297,6 +303,7 @@ async def websocket_endpoint(websocket: WebSocket):
         active_connections.remove(websocket)
         monitor_task.cancel()
 
+
 async def is_websocket_connected(websocket: WebSocket) -> bool:
     """Check if the websocket is still connected"""
     try:
@@ -305,6 +312,7 @@ async def is_websocket_connected(websocket: WebSocket) -> bool:
         return True
     except:
         return False
+
 
 async def monitor_docker_output(websocket: WebSocket):
     """Monitor Docker output and send to WebSocket"""
@@ -332,6 +340,7 @@ async def monitor_docker_output(websocket: WebSocket):
         # Cleanup when the task is cancelled
         pass
 
+
 async def send_output(websocket: WebSocket, output):
     """Send output to WebSocket"""
     try:
@@ -347,6 +356,7 @@ async def send_output(websocket: WebSocket, output):
     except Exception as e:
         print(f"Error sending output: {e}")
 
+
 @app.get("/config")
 async def get_config():
     """Get the current headless config"""
@@ -360,6 +370,7 @@ async def get_config():
         logger.error(f"Unexpected error in get_config endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
+
 @app.post("/config")
 async def update_config(config_data: Dict[Any, Any]):
     """Update the headless config"""
@@ -368,6 +379,7 @@ async def update_config(config_data: Dict[Any, Any]):
         return JSONResponse(content={"message": "Config updated successfully"})
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.post("/api/world-properties")
 async def update_world_properties(data: dict):
@@ -384,6 +396,7 @@ async def update_world_properties(data: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/api/restart-container")
 async def restart_container():
     """Restart the Docker container"""
@@ -392,6 +405,7 @@ async def restart_container():
         return JSONResponse(content={"message": "Container restart initiated"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn
