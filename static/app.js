@@ -443,7 +443,7 @@ let currentConfig = null;
 async function loadConfig() {
   console.log('loadConfig')
   try {
-    const response = await fetch('/config');
+    const response = await fetch(`http://${window.location.hostname}:8000/config`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -475,8 +475,8 @@ async function saveConfig() {
     // Validate JSON
     const config = JSON.parse(editor.value);
 
-    // Send to server
-    const response = await fetch('/config', {
+    // Send to server using window.location.hostname
+    const response = await fetch(`http://${window.location.hostname}:8000/config`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

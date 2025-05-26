@@ -10,21 +10,25 @@ if [ ! -f .env ]; then
     read -p "Enter CONTAINER_NAME: " CONTAINER_NAME
     # ask user for CONFIG_PATH
     read -p "Enter CONFIG_PATH: " CONFIG_PATH
-    # add CONTAINER_NAME and CONFIG_PATH to .env file
+    # ask user for SERVER_IP
+    read -p "Enter SERVER_IP (e.g. 192.168.1.100): " SERVER_IP
+    # add values to .env file
     echo "CONTAINER_NAME=$CONTAINER_NAME" >> .env
     echo "CONFIG_PATH=$CONFIG_PATH" >> .env
+    echo "SERVER_IP=$SERVER_IP" >> .env
 else
     echo ".env file found."
     # source the .env file
     source .env
-    # check if CONTAINER_NAME and CONFIG_PATH are set
-    if [ -z "$CONTAINER_NAME" ] || [ -z "$CONFIG_PATH" ]; then
-        echo "CONTAINER_NAME or CONFIG_PATH not set in .env file!"
+    # check if required variables are set
+    if [ -z "$CONTAINER_NAME" ] || [ -z "$CONFIG_PATH" ] || [ -z "$SERVER_IP" ]; then
+        echo "CONTAINER_NAME, CONFIG_PATH or SERVER_IP not set in .env file!"
         echo "Please delete the .env file and run the script again."
         exit 1
     else
         echo "CONTAINER_NAME: $CONTAINER_NAME"
         echo "CONFIG_PATH: $CONFIG_PATH"
+        echo "SERVER_IP: $SERVER_IP"
     fi
 fi
 
