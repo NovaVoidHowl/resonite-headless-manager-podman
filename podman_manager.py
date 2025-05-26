@@ -35,28 +35,49 @@ class PodmanManager:
 
   def _init_client(self):
     """Initialize the podman client based on available libraries"""
-    if USE_PODMAN_PY:
-      # Use native podman python library
-      # Determine socket URI based on OS platform
-      if os.name == 'nt':  # Windows
-        socket_uri = "tcp://localhost:8080"  # Default for podman machine
-      else:  # Linux/macOS
-        socket_uri = "unix:///run/podman/podman.sock"
+    try:
+      if USE_PODMAN_PY:
+        # Use native podman python library
+        # Determine socket URI based on OS platform
+        if os.name == 'nt':  # Windows
+          socket_uri = "tcp://localhost:8080"  # Default for podman machine
+        else:  # Linux/macOS
+          socket_uri = "unix:///run/podman/podman.sock"
 
-      self.client = podman.PodmanClient(base_url=socket_uri)
-    else:
-      # Use docker-py with podman socket
-      if os.name == 'nt':  # Windows
-        socket_url = "tcp://localhost:8080"  # Default for podman machine
-      else:  # Linux/macOS
-        socket_url = "unix:///run/podman/podman.sock"
-
-      if 'docker' in globals():
-        self.client = docker.DockerClient(base_url=socket_url)
+        self.client = podman.PodmanClient(base_url=socket_uri)
+        # Test connection
+        self.client.ping()
       else:
-        raise ImportError("docker module is not available. Ensure it is installed and accessible.")
+        # Use docker-py with podman socket
+        if os.name == 'nt':  # Windows
+          socket_url = "tcp://localhost:8080"  # Default for podman machine
+        else:  # Linux/macOS
+          socket_url = "unix:///run/podman/podman.sock"
 
-    logger.info(f"Podman client initialized with container name: {self.container_name}")
+        if 'docker' in globals():
+          self.client = docker.DockerClient(base_url=socket_url)
+          # Test connection
+          self.client.ping()
+        else:
+          raise ImportError("docker module is not available. Ensure it is installed and accessible.")
+
+      # Verify container exists
+      try:
+        self.client.containers.get(self.container_name)
+        logger.info(f"Successfully connected to container: {self.container_name}")
+      except Exception as container_error:
+        logger.error(f"Container not found or not accessible: {self.container_name}")
+        logger.error(f"Container error: {str(container_error)}")
+
+      logger.info(f"Podman client initialized with container name: {self.container_name}")
+    except Exception as e:
+      logger.critical(f"Failed to initialize Podman client: {str(e)}")
+      # Still set the client so the application can start, but it will show errors
+      if 'self.client' not in locals():
+        if USE_PODMAN_PY:
+          self.client = podman.PodmanClient(base_url="tcp://localhost:8080")
+        else:
+          self.client = docker.DockerClient(base_url="tcp://localhost:8080")
 
   def clean_output(self, text):
     """Clean and format output text by removing ANSI sequences and handling line breaks"""
@@ -77,44 +98,61 @@ class PodmanManager:
     with self.buffer_lock:
       return list(self.output_buffer)[-count:]
 
-  def send_command(self, command, timeout=1):
+  def send_command(self, command, timeout=5):
     """Send a command to the container and return the output"""
     try:
       container = self.client.containers.get(self.container_name)
 
       # Get raw connection to container without logs
-      conn_socket = container.attach_socket(params={
-        'stdin': True,
-        'stdout': True,
-        'stderr': True,
-        'stream': True,
-        'logs': False
-      })
+      try:
+        conn_socket = container.attach_socket(params={
+          'stdin': True,
+          'stdout': True,
+          'stderr': True,
+          'stream': True,
+          'logs': False
+        })
+      except Exception as socket_error:
+        logger.error(f"Failed to establish socket connection: {str(socket_error)}")
+        return f"Error: Failed to establish socket connection - {str(socket_error)}"
 
       # Send the command with a carriage return
-      cmd_bytes = f"{command}\r".encode('utf-8')
-      conn_socket._sock.send(cmd_bytes)
+      try:
+        cmd_bytes = f"{command}\r".encode('utf-8')
+        conn_socket._sock.send(cmd_bytes)
+      except Exception as send_error:
+        logger.error(f"Failed to send command to socket: {str(send_error)}")
+        conn_socket.close()
+        return f"Error: Failed to send command - {str(send_error)}"
 
       # Read the response with timeout
       output = []
       start_time = time.time()
       no_data_count = 0  # Counter for consecutive no-data readings
 
-      while True:
-        ready = select.select([conn_socket._sock], [], [], 0.1)
-        if ready[0]:
-          chunk = conn_socket._sock.recv(4096).decode('utf-8')
-          if chunk:
-            output.append(chunk)
-            no_data_count = 0  # Reset counter when we get data
-            continue
+      try:
+        while True:
+          ready = select.select([conn_socket._sock], [], [], 0.1)
+          if ready[0]:
+            chunk = conn_socket._sock.recv(4096).decode('utf-8')
+            if chunk:
+              output.append(chunk)
+              no_data_count = 0  # Reset counter when we get data
+              continue
 
-        no_data_count += 1
-        # Break if we've had no data for 3 consecutive reads or exceeded timeout
-        if no_data_count >= 3 or (time.time() - start_time > timeout):
-          break
+          no_data_count += 1
+          # Break if we've had no data for 3 consecutive reads or exceeded timeout
+          if no_data_count >= 3 or (time.time() - start_time > timeout):
+            break
+      except Exception as recv_error:
+        logger.error(f"Error receiving data from socket: {str(recv_error)}")
+        output.append(f"Error receiving data: {str(recv_error)}")
 
-      conn_socket.close()
+      try:
+        conn_socket.close()
+      except Exception as close_error:
+        logger.error(f"Error closing socket: {str(close_error)}")
+
       result = ''.join(output).strip()
       # Use clean_output instead of direct ANSI escape removal
       clean_lines = self.clean_output(result)
@@ -128,65 +166,81 @@ class PodmanManager:
     """Monitor container output continuously"""
     self._monitor_running = True
     buffer = ""
-    try:
-      container = self.client.containers.get(self.container_name)
-      # Completely disable historical logs and only get new output
-      output_socket = container.attach_socket(params={
-        'stdin': False,
-        'stdout': True,
-        'stderr': True,
-        'stream': True,
-        'logs': False,  # Disable historical logs
-        'since': 0,     # Ignore any historical logs
-      })
-
-      # Send initial carriage returns to get prompt
-      cmd_socket = container.attach_socket(params={
-        'stdin': True,
-        'stdout': True,
-        'stderr': True,
-        'stream': True,
-        'logs': False  # Also disable logs for command socket
-      })
-      cmd_socket._sock.send(b'\r')
-      cmd_socket.close()
-
-      while self._monitor_running:
-        ready = select.select([output_socket._sock], [], [], 0.1)
-        if ready[0]:
-          try:
-            chunk = output_socket._sock.recv(2048).decode('utf-8')
-            if chunk:
-              # Append chunk to buffer
-              buffer += chunk
-
-              # Process complete lines
-              while '\n' in buffer:
-                line, buffer = buffer.split('\n', 1)
-                line = line.strip()
-                if line:
-                  # Use clean_output for single line
-                  clean_lines = self.clean_output(line)
-                  for clean_line in clean_lines:
-                    self.add_to_buffer(clean_line)
-                    callback(clean_line + '\n')
-
-              # If buffer gets too large, clear it
-              if len(buffer) > 2048:
-                buffer = buffer[-1024:]
-
-          except Exception as e:
-            logger.error(f"Error reading from socket: {e}")
-            break
-
-    except Exception as e:
-      logger.error(f"Error monitoring container: {str(e)}")
-    finally:
-      self._monitor_running = False
+    retry_count = 0
+    max_retries = 3
+    retry_delay = 5  # seconds
+    
+    while self._monitor_running and retry_count <= max_retries:
       try:
-        output_socket.close()
-      except Exception:
-        pass
+        container = self.client.containers.get(self.container_name)
+        # Completely disable historical logs and only get new output
+        output_socket = container.attach_socket(params={
+          'stdin': False,
+          'stdout': True,
+          'stderr': True,
+          'stream': True,
+          'logs': False,  # Disable historical logs
+          'since': 0,     # Ignore any historical logs
+        })
+
+        # Send initial carriage returns to get prompt
+        cmd_socket = container.attach_socket(params={
+          'stdin': True,
+          'stdout': True,
+          'stderr': True,
+          'stream': True,
+          'logs': False  # Also disable logs for command socket
+        })
+        cmd_socket._sock.send(b'\r')
+        cmd_socket.close()
+        
+        # Reset retry count on successful connection
+        retry_count = 0
+
+        while self._monitor_running:
+          ready = select.select([output_socket._sock], [], [], 0.1)
+          if ready[0]:
+            try:
+              chunk = output_socket._sock.recv(2048).decode('utf-8')
+              if chunk:
+                # Append chunk to buffer
+                buffer += chunk
+
+                # Process complete lines
+                while '\n' in buffer:
+                  line, buffer = buffer.split('\n', 1)
+                  line = line.strip()
+                  if line:
+                    # Use clean_output for single line
+                    clean_lines = self.clean_output(line)
+                    for clean_line in clean_lines:
+                      self.add_to_buffer(clean_line)
+                      callback(clean_line + '\n')
+
+                # If buffer gets too large, clear it
+                if len(buffer) > 2048:
+                  buffer = buffer[-1024:]
+
+            except Exception as e:
+              logger.error(f"Error reading from socket: {str(e)}")
+              break
+
+      except Exception as e:
+        retry_count += 1
+        logger.error(f"Error monitoring container (attempt {retry_count}/{max_retries}): {str(e)}")
+        if retry_count <= max_retries:
+          logger.info(f"Retrying in {retry_delay} seconds...")
+          time.sleep(retry_delay)
+        else:
+          logger.error("Maximum retry attempts reached. Monitoring stopped.")
+      finally:
+        if 'output_socket' in locals():
+          try:
+            output_socket.close()
+          except Exception:
+            pass
+
+    self._monitor_running = False
 
   def get_container_status(self):
     """Get container status information"""
