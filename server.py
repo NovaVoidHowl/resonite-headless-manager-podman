@@ -5,13 +5,15 @@ import os
 import re
 import threading
 import time
+from contextlib import suppress
 from typing import Any, Dict
 
-import psutil  # Add this import
+import psutil
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.websockets import WebSocketState
 
 from podman_manager import PodmanManager
 
@@ -152,12 +154,12 @@ async def handle_command(websocket: WebSocket, command: str):
 
   if command == "listbans":
     bans = parse_bans(output)
-    await websocket.send_json({
+    await safe_send_json(websocket, {
       "type": "bans_update",
       "bans": bans
     })
   else:
-    await websocket.send_json({
+    await safe_send_json(websocket, {
       "type": "command_response",
       "command": command,
       "output": output
@@ -166,28 +168,37 @@ async def handle_command(websocket: WebSocket, command: str):
 
 async def handle_status(websocket: WebSocket):
   """Handle status request and system metrics"""
-  status = podman_manager.get_container_status()
-  status_dict = dict(status)  # Convert to dictionary if it's not already
+  try:
+    status = podman_manager.get_container_status()
+    status_dict = dict(status)  # Convert to dictionary if it's not already
 
-  cpu_percent = psutil.cpu_percent(interval=1)
-  memory = psutil.virtual_memory()
-  memory_percent = memory.percent
-  memory_used = f"{memory.used / (1024 * 1024 * 1024):.1f}GB"
-  memory_total = f"{memory.total / (1024 * 1024 * 1024):.1f}GB"
+    cpu_percent = psutil.cpu_percent(interval=1)
+    memory = psutil.virtual_memory()
+    memory_percent = memory.percent
+    memory_used = f"{memory.used / (1024 * 1024 * 1024):.1f}GB"
+    memory_total = f"{memory.total / (1024 * 1024 * 1024):.1f}GB"
 
-  # Create a new dictionary with all status data
-  full_status = {
-    **status_dict,
-    "cpu_usage": cpu_percent,  # Send as number instead of string
-    "memory_percent": memory_percent,  # Send as number instead of string
-    "memory_used": memory_used,
-    "memory_total": memory_total
-  }
+    # Create a new dictionary with all status data
+    full_status = {
+      **status_dict,
+      "cpu_usage": cpu_percent,
+      "memory_percent": memory_percent,
+      "memory_used": memory_used,
+      "memory_total": memory_total
+    }
 
-  await websocket.send_json({
-    "type": "status_update",
-    "status": full_status
-  })
+    await safe_send_json(websocket, {
+      "type": "status_update",
+      "status": full_status
+    })
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("Error in handle_status: %s", str(e))
+    # Only try to send error if connection is still valid
+    if await is_websocket_connected(websocket):
+      await safe_send_json(websocket, {
+        "type": "error",
+        "message": "Error getting status: %s" % str(e)
+      })
 
 
 def parse_key_value(key: str, value: str) -> Any:
@@ -251,9 +262,9 @@ async def get_world_users(world_index: int) -> list:
   return users_data
 
 
-async def get_world_data(world_line: str, index: int) -> dict:
+async def get_world_data(world_line: str, index: int) -> dict | None:
   """Parse world data and get its details"""
-  logger.info(f"Processing world line: {world_line}")
+  logger.info("Processing world line: %s", world_line)
 
   # Handle the [index] prefix if present
   if world_line.startswith('['):
@@ -264,15 +275,16 @@ async def get_world_data(world_line: str, index: int) -> dict:
   # Split on "Users:" to get the name and details
   parts = world_line.split("Users:", 1)
   if len(parts) != 2:
-    logger.warning(f"Invalid world line format (missing Users:): {world_line}")
+    logger.warning("Invalid world line format (missing Users:): %s", world_line)
     return None
 
   name = parts[0].strip()
 
   # Parse the details section using space as delimiter
   details = parts[1].strip().split()
-  if len(details) < 6:  # We expect at least 6 parts: Users count, "Present:", present count, "AccessLevel:", access level, max users
-    logger.warning(f"Invalid details format in world line: {parts[1]}")
+  # We expect at least: Users count, "Present:", present count, "AccessLevel:", access level, max users
+  if len(details) < 6:
+    logger.warning("Invalid details format in world line: %s", parts[1])
     return None
 
   try:
@@ -317,11 +329,11 @@ async def get_world_data(world_line: str, index: int) -> dict:
     # Get users list
     world_data["users_list"] = await get_world_users(index)
 
-    logger.info(f"Successfully parsed world data for {name}")
+    logger.info("Successfully parsed world data for %s", name)
     return world_data
 
-  except Exception as e:
-    logger.error(f"Error parsing world data: {str(e)}")
+  except (ValueError, IndexError, KeyError) as e:
+    logger.error("Error parsing world data: %s", str(e))
     return None
 
 
@@ -335,9 +347,9 @@ async def handle_worlds(websocket: WebSocket):
 
   # Skip the first line if it's just column headers
   if len(worlds_lines) > 0 and not worlds_lines[0].strip().startswith('['):
-      worlds_lines = worlds_lines[1:]
+    worlds_lines = worlds_lines[1:]
 
-  logger.info(f"Found {len(worlds_lines)} world(s) to process")
+  logger.info("Found %d world(s) to process", len(worlds_lines))
 
   worlds = []
   for i, world in enumerate(worlds_lines):
@@ -345,17 +357,43 @@ async def handle_worlds(websocket: WebSocket):
       world_data = await get_world_data(world, i)
       if world_data:
         worlds.append(world_data)
-        logger.info(f"Successfully processed world: {world_data['name']}")
+        logger.info("Successfully processed world: %s", world_data['name'])
       else:
-        logger.warning(f"Failed to process world line: {world}")
+        logger.warning("Failed to process world line: %s", world)
     except Exception as e:
-      logger.error(f"Error processing world {i}: {str(e)}")
+      logger.error("Error processing world %d: %s", i, str(e))
 
-  logger.info(f"Sending {len(worlds)} world(s) to client")
-  await websocket.send_json({
+  logger.info("Sending %d world(s) to client", len(worlds))
+  await safe_send_json(websocket, {
     "type": "worlds_update",
     "output": worlds
   })
+
+
+async def handle_websocket_message(websocket: WebSocket, message: str):
+  """Handle individual WebSocket messages"""
+  try:
+    data = json.loads(message)
+
+    if data["type"] == "command":
+      await handle_command(websocket, data["command"])
+    elif data["type"] == "get_status":
+      await handle_status(websocket)
+    elif data["type"] == "get_worlds":
+      await handle_worlds(websocket)
+  except json.JSONDecodeError:
+    if await is_websocket_connected(websocket):
+      await safe_send_json(websocket, {
+        "type": "error",
+        "message": "Invalid message format"
+      })
+  except (ConnectionError, RuntimeError, ValueError, KeyError) as e:
+    logger.error("Error handling message: %s", str(e))
+    if await is_websocket_connected(websocket):
+      await safe_send_json(websocket, {
+        "type": "error",
+        "message": "Error: %s" % str(e)
+      })
 
 
 @app.websocket("/ws")
@@ -368,39 +406,49 @@ async def websocket_endpoint(websocket: WebSocket):
   try:
     monitor_task = asyncio.create_task(monitor_docker_output(websocket))
 
-    while True:
+    while await is_websocket_connected(websocket):
       message = await websocket.receive_text()
-      try:
-        data = json.loads(message)
-
-        if data["type"] == "command":
-          await handle_command(websocket, data["command"])
-        elif data["type"] == "get_status":
-          await handle_status(websocket)
-        elif data["type"] == "get_worlds":
-          await handle_worlds(websocket)
-      except json.JSONDecodeError:
-        await websocket.send_json({
-          "type": "error",
-          "message": "Invalid message format"
-        })
+      await handle_websocket_message(websocket, message)
 
   except WebSocketDisconnect:
     logger.info("WebSocket disconnected normally")
-  except (ConnectionError, TimeoutError) as e:
-    logger.error("WebSocket connection error: %s", str(e))
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("WebSocket error: %s", str(e))
   finally:
-    active_connections.remove(websocket)
+    if websocket in active_connections:
+      active_connections.remove(websocket)
     if monitor_task:
       monitor_task.cancel()
+      with suppress(asyncio.CancelledError):
+        await monitor_task
 
 
 async def is_websocket_connected(websocket: WebSocket) -> bool:
-  """Check if the websocket is still connected"""
+  """Check if the websocket is still connected and in a valid state"""
   try:
-    await websocket.send_bytes(b'')
-    return True
-  except WebSocketDisconnect:  # Specify the exact exception we expect
+    if websocket.client_state != WebSocketState.CONNECTED:
+      return False
+
+    # Try to send a ping to verify connection
+    with suppress(WebSocketDisconnect, RuntimeError):
+      await websocket.send_bytes(b'')
+      return True
+
+    return False
+  except (ConnectionError, RuntimeError) as e:
+    logger.debug("Error checking websocket state: %s", str(e))
+    return False
+
+
+async def safe_send_json(websocket: WebSocket, data: dict) -> bool:
+  """Safely send JSON data over websocket with state checking"""
+  try:
+    if await is_websocket_connected(websocket):
+      await websocket.send_json(data)
+      return True
+    return False
+  except (ConnectionError, RuntimeError) as e:
+    logger.debug("Error sending data: %s", str(e))
     return False
 
 
@@ -439,7 +487,7 @@ async def send_output(websocket: WebSocket, output):
       if not isinstance(output, str):
         output = str(output)
 
-      await websocket.send_json({
+      await safe_send_json(websocket, {
         "type": "container_output",
         "output": output
       })
@@ -485,7 +533,7 @@ async def update_world_properties(data: dict):
     return JSONResponse(content={"message": "Properties updated successfully"})
   except (ValueError, KeyError) as e:
     raise HTTPException(status_code=400, detail=str(e)) from e
-  except Exception as e:
+  except (ConnectionError, RuntimeError) as e:
     logger.error("Error updating world properties: %s", str(e))
     raise HTTPException(status_code=500, detail=str(e)) from e
 
