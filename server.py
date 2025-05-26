@@ -150,11 +150,11 @@ async def process_worlds_command(podman_manager):
         worlds_output = worlds_output.split('\n')
         # Filter out empty lines and command prompts
         worlds_output = [line for line in worlds_output if line.strip() and not line.strip().endswith('>')]
-        
+
         # Remove the first line if it contains the command itself
         if worlds_output and "worlds" in worlds_output[0]:
             worlds_output = worlds_output[1:]
-            
+
         logger.info(f"Parsed worlds output lines: {len(worlds_output)}")
         logger.info(f"Worlds output: {worlds_output}")
 
@@ -170,23 +170,23 @@ async def process_worlds_command(podman_manager):
                 # First focus on this world
                 focus_result = podman_manager.send_command(f"focus {i}")
                 logger.info(f"Focus result: {focus_result}")
-                
+
                 # Add delay to prevent overwhelming the container
                 await asyncio.sleep(0.5)
 
                 # Get detailed status
                 status_output = podman_manager.send_command("status")
                 logger.info(f"Status output for world {i}: {status_output}")
-                
+
                 # Skip if status command failed or returned nothing useful
                 if not status_output or "Unknown command" in status_output:
                     logger.warning(f"Failed to get status for world {i}")
                     continue
-                    
+
                 # Split the output into lines and remove empty lines and prompts
-                status_lines = [line for line in status_output.split('\n') 
+                status_lines = [line for line in status_output.split('\n')
                                 if line.strip() and not line.strip().endswith('>')]
-                
+
                 # Remove the command line if present
                 if status_lines and "status" in status_lines[0]:
                     status_lines = status_lines[1:]
@@ -199,7 +199,7 @@ async def process_worlds_command(podman_manager):
                         status_data[key.strip()] = value.strip()
 
                 logger.info(f"Parsed status data: {status_data}")
-                
+
                 # If status_data is empty, create minimal data to avoid skipping
                 if not status_data:
                     logger.warning(f"Empty status data for world {i}, using minimal data")
@@ -220,7 +220,7 @@ async def process_worlds_command(podman_manager):
                 # Extract name and index from the first part
                 name_part = parts[0] if parts else world
                 users_index = name_part.find("Users:")
-                
+
                 # Handle case where "Users:" is not found
                 if users_index == -1:
                     name = name_part.strip()
@@ -256,15 +256,15 @@ async def process_worlds_command(podman_manager):
                 # Send the users command to the focused world
                 users_output = podman_manager.send_command("users")
                 logger.info(f"Users output for world {i}: {users_output}")
-                
+
                 # Remove command and prompt lines
-                users_lines = [line for line in users_output.split('\n') 
+                users_lines = [line for line in users_output.split('\n')
                               if line.strip() and not line.strip().endswith('>')]
-                
+
                 # Remove the command line if present
                 if users_lines and "users" in users_lines[0]:
                     users_lines = users_lines[1:]
-                    
+
                 logger.info(f"Parsed users lines: {users_lines}")
 
                 # Parse users
@@ -482,16 +482,18 @@ async def send_output(websocket: WebSocket, output):
   """Send output to WebSocket"""
   try:
     if await is_websocket_connected(websocket):
-      # Ensure the output is properly encoded
+      # Ensure the output is properly encoded as JSON
       if not isinstance(output, str):
         output = str(output)
 
+      # Always send as JSON with proper structure
       await websocket.send_json({
         "type": "container_output",
         "output": output
       })
   except Exception as e:
-    print(f"Error sending output: {e}")
+    logger.error(f"Error sending output: {e}")
+    # Don't rethrow the exception to avoid crashing the WebSocket handler
 
 
 @app.get("/config")
@@ -539,20 +541,20 @@ async def update_world_properties(data: dict):
 
     # Focus on the specific world
     podman_manager.send_command(f"focus {world_index}")
-    
+
     # Update each property if provided
     if 'name' in data:
       podman_manager.send_command(f"worldname \"{data['name']}\"")
-      
+
     if 'description' in data:
       podman_manager.send_command(f"description \"{data['description']}\"")
-      
+
     if 'accessLevel' in data:
       podman_manager.send_command(f"access {data['accessLevel']}")
-      
+
     if 'maxUsers' in data:
       podman_manager.send_command(f"maxusers {data['maxUsers']}")
-      
+
     if 'hidden' in data:
       hidden_value = "true" if data['hidden'] else "false"
       podman_manager.send_command(f"hidden {hidden_value}")

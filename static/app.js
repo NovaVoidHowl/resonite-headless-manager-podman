@@ -41,10 +41,10 @@ function hideLoadingOverlay() {
 function displayErrorMessage(message, duration = 5000) {
   const errorToast = document.querySelector('.error-toast');
   const errorMessage = document.querySelector('.error-toast-message');
-  
+
   errorMessage.textContent = message;
   errorToast.classList.add('show');
-  
+
   // Auto-hide after duration
   if (duration > 0) {
     setTimeout(() => {
@@ -68,10 +68,10 @@ function hideErrorMessage() {
  */
 function showSuccessMessage(message, duration = 3000) {
   const successToast = document.querySelector('.copy-success-message');
-  
+
   successToast.textContent = message;
   successToast.classList.add('show');
-  
+
   // Auto-hide after duration
   setTimeout(() => {
     successToast.classList.remove('show');
@@ -80,7 +80,7 @@ function showSuccessMessage(message, duration = 3000) {
 
 document.addEventListener('DOMContentLoaded', function() {
   hideLoadingOverlay();
-  
+
   // Set up error toast close button
   const closeButton = document.querySelector('.error-toast-close');
   if (closeButton) {
@@ -171,50 +171,81 @@ function sendWorldCommand(worldId, command, additionalData = {}) {
   }
 }
 
-// Update the handleMessage function to handle different message types
+// Update the handleMessage function to handle different message types and formats
 function handleMessage(data) {
   try {
-    const message = JSON.parse(data);
-
-    // Handle different message types
-    if (message.type === 'status') {
-      // Status message
-      updateStatus(message.data);
-
-    } else if (message.type === 'worlds') {
-      // Worlds list message
-      hideLoadingOverlay(); // Hide loading overlay when worlds data is received
-      updateWorlds(message.data);
-
-    } else if (message.type === 'world_details') {
-      // World details message
-      hideLoadingOverlay(); // Hide loading overlay when world details are received
-      handleWorldDetailsUpdate(message.data);
-
-    } else if (message.type === 'command_response') {
-      // Command response message
-      hideLoadingOverlay(); // Hide loading overlay when command response is received
-
-      // Handle success or failure
-      if (message.status === 'success') {
-        // Show success message if needed for certain commands
-        if (message.data && message.data.message) {
-          showSuccessMessage(message.data.message);
+    // Handle binary data or Blob objects
+    if (data instanceof Blob) {
+      // Convert blob to text and then parse
+      data.text().then(text => {
+        try {
+          const message = JSON.parse(text);
+          processJsonMessage(message);
+        } catch (parseError) {
+          console.error('Error parsing Blob message:', parseError);
+          displayErrorMessage('Failed to parse server message');
         }
-      } else {
-        displayErrorMessage(message.data.error || 'Command failed'); // Show error message
-      }
-
-    } else if (message.type === 'error') {
-      // Error message
-      hideLoadingOverlay(); // Hide loading overlay on error
-      displayErrorMessage(message.data.error || 'Unknown error'); // Show error message
+      }).catch(error => {
+        console.error('Error reading Blob data:', error);
+        displayErrorMessage('Failed to process server message');
+      });
+      return;
     }
 
+    // Handle string data - try to parse as JSON
+    const message = JSON.parse(data);
+    processJsonMessage(message);
   } catch (error) {
-    hideLoadingOverlay(); // Hide loading overlay on parsing error
-    displayErrorMessage('Failed to parse server message'); // Show error message
     console.error('Error parsing message:', error);
+    displayErrorMessage('Failed to parse server message');
+  }
+}
+
+// Helper function to process JSON messages once parsed
+function processJsonMessage(message) {
+  // Handle different message types
+  if (message.type === 'status' || message.type === 'status_update') {
+    // Status message
+    updateStatus(message.data || message.status);
+    hideLoadingOverlay();
+
+  } else if (message.type === 'worlds' || message.type === 'worlds_update') {
+    // Worlds list message
+    hideLoadingOverlay(); // Hide loading overlay when worlds data is received
+    updateWorlds(message.data || message.worlds);
+
+  } else if (message.type === 'world_details') {
+    // World details message
+    hideLoadingOverlay(); // Hide loading overlay when world details are received
+    handleWorldDetailsUpdate(message.data);
+
+  } else if (message.type === 'command_response') {
+    // Command response message
+    hideLoadingOverlay(); // Hide loading overlay when command response is received
+
+    // Handle success or failure
+    if (message.status === 'success') {
+      // Show success message if needed for certain commands
+      if (message.data && message.data.message) {
+        showSuccessMessage(message.data.message);
+      }
+    } else {
+      displayErrorMessage(message.data?.error || 'Command failed'); // Show error message
+    }
+
+  } else if (message.type === 'container_output') {
+    // Container output message
+    if (message.output) {
+      appendOutput(message.output);
+    }
+
+  } else if (message.type === 'error') {
+    // Error message
+    hideLoadingOverlay(); // Hide loading overlay on error
+    displayErrorMessage(message.data?.error || message.message || 'Unknown error'); // Show error message
+  } else if (message.type === 'bans_update') {
+    // Bans update message
+    updateBansList(message.bans || []);
   }
 }
 
@@ -222,10 +253,10 @@ function handleMessage(data) {
 function copyWorldInfo(worldId) {
   const worldCard = document.querySelector(`[data-world-id="${worldId}"]`);
   if (!worldCard) return;
-  
+
   const worldName = worldCard.querySelector('.world-name').textContent;
   const worldAddress = `resonite://neos/${worldId}`;
-  
+
   try {
     navigator.clipboard.writeText(worldAddress);
     showSuccessMessage(`Copied link to ${worldName}`);
@@ -239,9 +270,9 @@ function copyWorldInfo(worldId) {
 function saveWorldProperties() {
   const worldId = document.getElementById('world-properties').dataset.worldId;
   if (!worldId) return;
-  
+
   showLoadingOverlay();
-  
+
   const properties = {
     name: document.getElementById('world-name').value,
     description: document.getElementById('world-description').value,
@@ -249,9 +280,9 @@ function saveWorldProperties() {
     maxUsers: parseInt(document.getElementById('world-max-users').value) || 16,
     hidden: document.getElementById('world-hidden').checked
   };
-  
+
   sendWorldCommand(worldId, 'update_properties', { properties });
-  
+
   // Success message will be shown when we receive confirmation from the server
 }
 
@@ -260,18 +291,18 @@ function saveConfig() {
   const configText = document.getElementById('config-editor').value;
   const errorDisplay = document.querySelector('.config-section .error-message');
   errorDisplay.textContent = '';
-  
+
   try {
     // Validate JSON
     JSON.parse(configText);
-    
+
     // Send to server
     showLoadingOverlay();
     sendCommand(JSON.stringify({
       command: 'update_config',
       config: configText
     }));
-    
+
     // Success will be shown when we receive confirmation from the server
   } catch (error) {
     errorDisplay.textContent = `Error: ${error.message}`;
@@ -298,7 +329,7 @@ function toggleCard(cardId) {
   const content = document.getElementById(cardId);
   const header = content.previousElementSibling;
   const icon = header.querySelector('.collapse-icon');
-  
+
   if (content.style.display === 'none' || !content.style.display) {
     content.style.display = 'block';
     icon.textContent = '▼';
@@ -314,10 +345,10 @@ function toggleCard(cardId) {
 function toggleConsole() {
   const consoleSection = document.querySelector('.console-section');
   consoleSection.classList.toggle('show');
-  
+
   const toggleButton = document.querySelector('.toggle-console');
   const icon = toggleButton.querySelector('.icon');
-  
+
   if (consoleSection.classList.contains('show')) {
     icon.textContent = '▲';
   } else {
@@ -331,10 +362,10 @@ function toggleConsole() {
 function toggleConfig() {
   const configSection = document.querySelector('.config-section');
   configSection.classList.toggle('show');
-  
+
   const toggleButton = document.querySelector('button:nth-child(2)');
   const icon = toggleButton.querySelector('.icon');
-  
+
   if (configSection.classList.contains('show')) {
     icon.textContent = '▲';
     // Fetch config when opening the editor
@@ -377,13 +408,13 @@ function banUser() {
     displayErrorMessage('Please enter a username to ban');
     return;
   }
-  
+
   showLoadingOverlay();
   sendCommand(JSON.stringify({
     command: 'ban_user',
     username: username
   }));
-  
+
   // Clear the input field
   document.getElementById('ban-username').value = '';
 }
@@ -406,15 +437,15 @@ function updateStatus(message, status) {
   if (statusText) {
     statusText.textContent = message;
   }
-  
+
   // Remove all status classes
   statusDiv.classList.remove('status-connecting', 'status-running', 'status-stopped');
-  
+
   // Add the current status class
   if (status) {
     statusDiv.classList.add(`status-${status}`);
   }
-  
+
   // Update last updated time
   const lastUpdated = document.querySelector('.last-updated');
   if (lastUpdated) {
@@ -429,24 +460,24 @@ function updateStatus(message, status) {
  */
 function updateWorlds(worlds) {
   const worldsContainer = document.getElementById('worlds-list');
-  
+
   // Clear existing content
   worldsContainer.innerHTML = '';
-  
+
   if (!worlds || worlds.length === 0) {
     worldsContainer.innerHTML = '<div class="no-worlds">No active worlds</div>';
     return;
   }
-  
+
   // Sort worlds by name
   worlds.sort((a, b) => a.name.localeCompare(b.name));
-  
+
   // Create world cards
   worlds.forEach(world => {
     const worldCard = document.createElement('div');
     worldCard.className = 'world-card';
     worldCard.dataset.worldId = world.id;
-    
+
     worldCard.innerHTML = `
       <div class="world-name">${world.name}</div>
       <div class="world-details">
@@ -469,10 +500,10 @@ function updateWorlds(worlds) {
         <div class="world-description">${world.description || 'No description'}</div>
       </div>
     `;
-    
+
     // Add click event for world selection
     worldCard.addEventListener('click', () => selectWorld(world.id));
-    
+
     // Add the world card to the container
     worldsContainer.appendChild(worldCard);
   });
@@ -485,11 +516,11 @@ function updateWorlds(worlds) {
  */
 function formatUptime(seconds) {
   if (!seconds) return 'N/A';
-  
+
   const days = Math.floor(seconds / (24 * 60 * 60));
   const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
   const minutes = Math.floor((seconds % (60 * 60)) / 60);
-  
+
   if (days > 0) {
     return `${days}d ${hours}h ${minutes}m`;
   } else if (hours > 0) {
@@ -508,16 +539,16 @@ function selectWorld(worldId) {
   document.querySelectorAll('.world-card.selected').forEach(card => {
     card.classList.remove('selected');
   });
-  
+
   // Mark the selected world
   const selectedCard = document.querySelector(`[data-world-id="${worldId}"]`);
   if (selectedCard) {
     selectedCard.classList.add('selected');
   }
-  
+
   // Show loading overlay
   showLoadingOverlay();
-  
+
   // Request world details
   sendCommand(JSON.stringify({
     command: 'get_world_details',
@@ -531,20 +562,20 @@ function selectWorld(worldId) {
  */
 function handleWorldDetailsUpdate(worldData) {
   const worldPropertiesPanel = document.getElementById('world-properties');
-  
+
   // Store the world ID in the panel
   worldPropertiesPanel.dataset.worldId = worldData.id;
-  
+
   // Set world name in the selected section
   document.getElementById('selected-world-name').textContent = worldData.name;
-  
+
   // Populate form fields
   document.getElementById('world-name').value = worldData.name;
   document.getElementById('world-description').value = worldData.description || '';
   document.getElementById('world-access-level').value = worldData.accessLevel;
   document.getElementById('world-max-users').value = worldData.maxUsers;
   document.getElementById('world-hidden').checked = worldData.hidden;
-  
+
   // Show the properties panel
   worldPropertiesPanel.style.display = 'block';
 }
@@ -563,14 +594,14 @@ function startFriendRequestsTimer() {
   if (friendRequestsTimer) {
     clearInterval(friendRequestsTimer);
   }
-  
+
   // Get the interval from the settings
   const interval = parseInt(document.getElementById('friend-requests-interval').value) || 5;
   friendRequestsInterval = interval * 60 * 1000;
-  
+
   // Initial fetch
   fetchFriendRequests();
-  
+
   // Set up periodic checking
   friendRequestsTimer = setInterval(fetchFriendRequests, friendRequestsInterval);
 }
@@ -589,7 +620,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   }
-  
+
   // Set up interval inputs
   const refreshIntervalInput = document.getElementById('refresh-interval');
   if (refreshIntervalInput) {
@@ -598,11 +629,11 @@ document.addEventListener('DOMContentLoaded', function() {
       // Store in localStorage for persistence
       localStorage.setItem('refreshInterval', interval);
     });
-    
+
     // Set initial value from localStorage or default
     refreshIntervalInput.value = localStorage.getItem('refreshInterval') || 30;
   }
-  
+
   const friendRequestsIntervalInput = document.getElementById('friend-requests-interval');
   if (friendRequestsIntervalInput) {
     friendRequestsIntervalInput.addEventListener('change', function() {
@@ -610,17 +641,17 @@ document.addEventListener('DOMContentLoaded', function() {
       localStorage.setItem('friendRequestsInterval', interval);
       startFriendRequestsTimer();
     });
-    
+
     // Set initial value from localStorage or default
     friendRequestsIntervalInput.value = localStorage.getItem('friendRequestsInterval') || 5;
   }
-  
+
   // Start timers
   startFriendRequestsTimer();
-  
+
   // Initial fetch of worlds list
   fetchWorldsList();
-  
+
   // Set up automatic refresh of worlds list
   setInterval(fetchWorldsList, (parseInt(localStorage.getItem('refreshInterval')) || 30) * 1000);
 });
