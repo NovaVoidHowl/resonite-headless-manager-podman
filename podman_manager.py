@@ -3,8 +3,6 @@ import re
 from collections import deque
 from threading import Lock
 import logging
-import subprocess
-import shlex
 import threading
 import podman
 
@@ -21,6 +19,7 @@ class PodmanManager:
     # Regex pattern for ANSI escape sequences
     self.ansi_escape = re.compile(r'(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]|\x1B[()][AB012]')
     self._monitor_running = False
+    self.client = None
 
     # Initialize podman client
     self._init_client()
@@ -86,182 +85,124 @@ class PodmanManager:
     with self.buffer_lock:
       return list(self.output_buffer)[-count:]
 
-  def _direct_podman_exec(self, command):
-    """Directly execute a command in the container using podman command line tool
-
-    This method bypasses socket connections entirely by using the podman CLI directly,
-    which is more reliable when there are socket permission issues.
-    """
-    try:
-      logger.info("Executing command via direct podman exec: %s", command)
-
-      # Create the podman exec command
-      podman_cmd = f"podman exec -it {self.container_name} bash -c {shlex.quote(command)}"
-      logger.info("Running podman command: %s", podman_cmd)
-
-      # Execute the command and capture output
-      process = subprocess.Popen(
-        podman_cmd,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-      )
-
-      stdout, stderr = process.communicate(timeout=5)
-
-      if process.returncode != 0:
-        logger.warning("Direct podman exec returned non-zero exit code: %d", process.returncode)
-        logger.warning("stderr: %s", stderr)
-        if stderr:
-          return f"Error: {stderr}"
-
-      return stdout
-
-    except Exception as e:
-      logger.error("Error in direct podman exec: %s", str(e))
-      return f"Error: {str(e)}"
-
   def send_command(self, command, timeout=5):
     """Send a command to the container and return the output"""
     logger.info("Sending command to container: %s", command)
-    
+
     try:
-      # Get container instance to verify it exists
+      # Get container instance
       container = self.client.containers.get(self.container_name)
       logger.info("Container verified: %s", container.name)
-      
-      # Try container.exec_run first (preferred method for podman-py)
-      try:
-        if hasattr(container, 'exec_run'):
-          logger.info("Using exec_run to execute command: %s", command)
-          # According to the official documentation, exec_run returns a tuple of (exit_code, output)
-          exec_result = container.exec_run(['bash', '-c', command])
-          
-          # Check if the result is a tuple as expected
-          if isinstance(exec_result, tuple) and len(exec_result) >= 2:
-            exit_code, output = exec_result
-            logger.info("exec_run returned exit_code: %s", exit_code)
-            
-            if exit_code == 0:
-              decoded_output = output.decode('utf-8').strip() if isinstance(output, bytes) else str(output).strip()
-              return decoded_output
-            else:
-              logger.warning("exec_run returned non-zero exit code: %d", exit_code)
-          else:
-            # Handle case where the API returns a different format
-            logger.warning("exec_run returned unexpected format: %s", str(exec_result))
-            
-            # Try to work with the result anyway
-            if hasattr(exec_result, 'output'):
-              output = exec_result.output
-              decoded_output = output.decode('utf-8').strip() if isinstance(output, bytes) else str(output).strip()
-              return decoded_output
-      except Exception as exec_error:
-        logger.warning("exec_run failed: %s", str(exec_error))
-      
-      # Fall back to direct podman exec if exec_run fails
-      return self._direct_podman_exec(command)
-    
+
+      # Use exec_run to execute the command inside the container
+      logger.info("Using exec_run to execute command: %s", command)
+
+      # Format command properly - either as string or list depending on what it contains
+      cmd_to_run = ['bash', '-c', command]
+
+      # Use the API as described in the documentation
+      result = container.exec_run(
+        cmd=cmd_to_run,
+        stdout=True,
+        stderr=True,
+        tty=True
+      )
+
+      # Process the result based on return type
+      if isinstance(result, tuple) and len(result) >= 2:
+        exit_code, output = result
+        logger.info("exec_run returned exit_code: %s", exit_code)
+
+        # Decode output if it's bytes
+        if isinstance(output, bytes):
+          decoded_output = output.decode('utf-8').strip()
+        else:
+          decoded_output = str(output).strip()
+
+        return decoded_output
+      else:
+        # Handle case where the result is not a tuple
+        logger.warning("exec_run returned unexpected format: %s", str(result))
+
+        # Try to extract output from the result
+        if hasattr(result, 'output'):
+          output = result.output
+          if isinstance(output, bytes):
+            return output.decode('utf-8').strip()
+          return str(output).strip()
+
+        # Last resort - convert the whole result to string
+        return str(result).strip()
+
     except Exception as e:
       error_msg = str(e).strip() or "Unknown error"
       logger.error("Error sending command to container: %s", error_msg)
       return f"Error: {error_msg}"
 
-  def _direct_log_monitoring(self, callback):
-    """Monitoring using direct podman logs command
+  def monitor_output(self, callback):
+    """Monitor container output continuously using the Podman Python API logs method"""
+    self._monitor_running = True
+    logger.info("Starting container log monitoring")
 
-    Uses the podman logs command with --follow to monitor container output.
-    """
     try:
-      logger.info("Starting direct log monitoring for container: %s", self.container_name)
+      container = self.client.containers.get(self.container_name)
 
-      def read_stream(stream, cb):
-        """Read lines from stream and call callback for each line"""
-        for line in iter(stream.readline, b''):
-            if not line:
-                break
-            decoded_line = line.decode('utf-8').strip()
+      # Define a function to handle log processing in a separate thread
+      def process_logs():
+        try:
+          # Use the logs method with follow=True to stream logs continuously
+          for log_line in container.logs(
+            stdout=True,
+            stderr=True,
+            follow=True,
+            stream=True,
+            since=0  # Get all logs from the start
+          ):
+            if not self._monitor_running:
+              break
+
+            if isinstance(log_line, bytes):
+              decoded_line = log_line.decode('utf-8').strip()
+            else:
+              decoded_line = str(log_line).strip()
+
             if decoded_line:
-                self.add_to_buffer(decoded_line)
-                cb(decoded_line + '\n')
+              self.add_to_buffer(decoded_line)
+              callback(decoded_line + '\n')
+        except Exception as log_error:
+          logger.error("Error in log monitoring: %s", str(log_error))
 
-      # Start podman logs process with --follow flag
-      process = subprocess.Popen(
-        ["podman", "logs", "--follow", self.container_name],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        bufsize=1  # Line buffered
-      )
+      # Start log processing in a separate thread
+      log_thread = threading.Thread(target=process_logs, daemon=True)
+      log_thread.start()
 
-      # Create threads to monitor stdout and stderr
-      stdout_thread = threading.Thread(
-        target=read_stream,
-        args=(process.stdout, callback),
-        daemon=True
-      )
-      stderr_thread = threading.Thread(
-        target=read_stream,
-        args=(process.stderr, callback),
-        daemon=True
-      )
-
-      # Start the threads
-      stdout_thread.start()
-      stderr_thread.start()
-
-      # Monitor and keep process running while _monitor_running is True
-      while self._monitor_running:
-        if process.poll() is not None:
-          # Process ended unexpectedly
-          logger.warning("Direct log monitoring process ended unexpectedly")
-          break
+      # Wait for the monitoring to be stopped
+      while self._monitor_running and log_thread.is_alive():
         time.sleep(0.5)
 
-      # Clean up process when monitoring stops
-      try:
-        process.terminate()
-        process.wait(timeout=2)
-      except subprocess.TimeoutExpired:
-        try:
-          process.kill()
-        except subprocess.SubprocessError:
-          pass
-
-      logger.info("Direct log monitoring stopped")
-      return True
+      logger.info("Log monitoring stopped")
 
     except Exception as e:
-      logger.error("Error in direct log monitoring: %s", str(e))
-      return False
-
-  def monitor_output(self, callback):
-    """Monitor container output continuously"""
-    self._monitor_running = True
-
-    # Skip socket-based monitoring attempts since they're failing
-    # and go directly to direct log monitoring
-    logger.info("Using direct log monitoring")
-    if self._direct_log_monitoring(callback):
-      logger.info("Direct log monitoring successfully started")
-    else:
-      logger.error("Log monitoring failed")
-
-    self._monitor_running = False
-    logger.info("Monitor output stopped")
+      logger.error("Failed to start log monitoring: %s", str(e))
+      self._monitor_running = False
 
   def get_container_status(self):
     """Get container status information"""
     try:
       container = self.client.containers.get(self.container_name)
+
+      # Get detailed inspection data
+      inspect_data = container.inspect()
+
       return {
         'status': container.status,
         'name': container.name,
-        'id': container.id
+        'id': container.id,
+        'image': inspect_data.get('ImageName', container.image)
       }
     except Exception as e:
       logger.error("Error getting container status: %s", str(e))
-      return {'error': str(e)}
+      return {'error': str(e), 'status': 'unknown'}
 
   def restart_container(self):
     """Safely restart the Podman container"""
@@ -271,31 +212,23 @@ class PodmanManager:
       # Stop monitoring if it's running
       self._monitor_running = False
 
-      # First try to gracefully stop the container
-      try:
-        container.stop(timeout=30)  # Give it 30 seconds to stop gracefully
-      except Exception as e:
-        logger.warning("Failed to stop container gracefully: %s", e)
-        # Try to force kill if graceful stop fails
-        container.kill()
+      # Use the container's restart method with timeout
+      logger.info("Restarting container: %s", self.container_name)
+      container.restart(timeout=30)
 
-      # Wait for container to fully stop
-      try:
-        container.wait(timeout=35)
-      except Exception as e:
-        logger.warning("Container wait timeout: %s", e)
-
-      # Restart the container
-      container.restart()
-
-      # Wait for container to be running
+      # Wait for container to be running again
       retries = 0
-      while retries < 10:
+      max_retries = 10
+      while retries < max_retries:
         container.reload()
         if container.status == 'running':
+          logger.info("Container successfully restarted")
           break
         time.sleep(1)
         retries += 1
+
+      if retries >= max_retries:
+        logger.warning("Container restart took longer than expected")
 
       return True
 
