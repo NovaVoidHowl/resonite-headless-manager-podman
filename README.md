@@ -1,5 +1,3 @@
-# Resonite Headless Manager
-
 <a name="readme-top"></a>
 
 <!-- PROJECT SHIELDS -->
@@ -18,7 +16,7 @@
 
 <br />
 <div align="center">
-<h3 align="center">VCC Loader</h3>
+<h3 align="center">Resonite Headless Manager (Podman Edition)</h3>
 
 <p align="center">
     <br />
