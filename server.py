@@ -417,9 +417,6 @@ def clean_terminal_output(output):
   ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
   output = ansi_escape.sub('', output)
 
-  # Remove common prompt text
-  output = re.sub(r'Headless Software Debug do not join>', '', output)
-
   # Strip leading/trailing whitespace
   output = output.strip()
 
