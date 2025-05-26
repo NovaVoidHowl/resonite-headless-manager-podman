@@ -290,6 +290,28 @@ function processJsonMessage(message) {
 }
 
 /**
+ * Append output to the console output element
+ * @param {string} text - Text to append
+ */
+function appendOutput(text) {
+  if (!output) return;
+  
+  // Check if we need to add a newline before appending
+  if (output.innerHTML && !output.innerHTML.endsWith('\n') && !output.innerHTML.endsWith('<br>')) {
+    output.innerHTML += '\n';
+  }
+  
+  // Replace newlines with <br> for HTML display
+  const formattedText = text.replace(/\n/g, '<br>');
+  
+  // Append the formatted text to the output element
+  output.innerHTML += formattedText;
+  
+  // Auto-scroll to bottom
+  output.scrollTop = output.scrollHeight;
+}
+
+/**
  * Display structured user data in a formatted way
  * @param {Array} users - Array of user objects with structured data
  */
