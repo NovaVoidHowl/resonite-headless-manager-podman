@@ -1673,3 +1673,39 @@ button {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* Add CSS styles for loading state placeholder with pulsing animation */
+.world-card.loading {
+  position: relative;
+  background: #2a2a2a;
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 2s infinite;
+  border: 2px solid transparent;
+}
+
+.loading-content {
+  text-align: center;
+  color: #666;
+}
+
+.loading-text {
+  font-size: 1.1em;
+}
+
+@keyframes pulse {
+  0% {
+    border-color: transparent;
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.1);
+  }
+  50% {
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1);
+  }
+  100% {
+    border-color: transparent;
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.1);
+  }
+}

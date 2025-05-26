@@ -189,9 +189,24 @@ function updateStatus(status) {
 
 function updateWorlds(worlds) {
   const worldsList = document.getElementById('worlds-list');
-  worldsList.innerHTML = ''; // Clear existing worlds
 
-  if (!worlds || worlds.length === 0) {
+  // Clear existing worlds
+  worldsList.innerHTML = '';
+
+  // If worlds is undefined/null, show loading placeholder
+  if (!worlds) {
+    const loadingPlaceholder = document.createElement('div');
+    loadingPlaceholder.className = 'world-card loading';
+    loadingPlaceholder.innerHTML = `
+      <div class="loading-content">
+        <span class="loading-text">Retrieving Instance Data</span>
+      </div>
+    `;
+    worldsList.appendChild(loadingPlaceholder);
+    return;
+  }
+
+  if (worlds.length === 0) {
     const noWorldsDiv = document.createElement('div');
     noWorldsDiv.className = 'no-worlds';
     noWorldsDiv.textContent = 'No active worlds found';
