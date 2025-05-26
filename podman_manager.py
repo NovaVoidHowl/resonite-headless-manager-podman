@@ -88,52 +88,53 @@ class PodmanManager:
   def send_command(self, command, timeout=5):
     """Send a command to the container and return the output"""
     logger.info("Sending command to container: %s", command)
-
+    
     try:
       # Get container instance
       container = self.client.containers.get(self.container_name)
       logger.info("Container verified: %s", container.name)
-
+      
       # Use exec_run to execute the command inside the container
-      logger.info("Using exec_run to execute command: %s", command)
-
-      # Format command properly - either as string or list depending on what it contains
-      cmd_to_run = ['bash', '-c', command]
-
-      # Use the API as described in the documentation
+      logger.info("Using exec_run with direct command: %s", command)
+      
+      # For Resonite Headless container, send the command directly without shell wrapper
       result = container.exec_run(
-        cmd=cmd_to_run,
+        cmd=command,  # Send command as is, without bash/sh wrapper
         stdout=True,
         stderr=True,
         tty=True
       )
-
-      # Process the result based on return type
+      
+      # Process the result
       if isinstance(result, tuple) and len(result) >= 2:
         exit_code, output = result
         logger.info("exec_run returned exit_code: %s", exit_code)
-
-        # Decode output if it's bytes
+        
+        # Log and decode output
         if isinstance(output, bytes):
           decoded_output = output.decode('utf-8').strip()
         else:
           decoded_output = str(output).strip()
-
+        
+        logger.info("Command output length: %d chars", len(decoded_output))
+        if decoded_output:
+          logger.debug("Command output sample: %s", decoded_output[:200] if len(decoded_output) > 200 else decoded_output)
+        
         return decoded_output
       else:
         # Handle case where the result is not a tuple
         logger.warning("exec_run returned unexpected format: %s", str(result))
-
+        
         # Try to extract output from the result
         if hasattr(result, 'output'):
           output = result.output
           if isinstance(output, bytes):
             return output.decode('utf-8').strip()
           return str(output).strip()
-
+        
         # Last resort - convert the whole result to string
         return str(result).strip()
-
+    
     except Exception as e:
       error_msg = str(e).strip() or "Unknown error"
       logger.error("Error sending command to container: %s", error_msg)
