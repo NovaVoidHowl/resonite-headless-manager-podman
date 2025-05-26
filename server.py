@@ -1,11 +1,10 @@
-from fastapi import FastAPI, WebSocket, HTTPException
+from fastapi import FastAPI, WebSocket, HTTPException, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import asyncio
 from podman_manager import PodmanManager
 import json
 import threading
-from functools import partial
 import time
 from dotenv import load_dotenv
 import os
@@ -29,7 +28,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 active_connections = []
 
 # Initialize PodmanManager with container name from .env
-podman_manager = PodmanManager(os.getenv('CONTAINER_NAME', 'resonite-headless'))  # Fallback to 'resonite-headless' if not set
+podman_manager = PodmanManager(
+    os.getenv('CONTAINER_NAME', 'resonite-headless')  # Fallback to 'resonite-headless' if not set
+)
 
 
 # Add config file handling
@@ -40,20 +41,20 @@ def load_config() -> Dict[Any, Any]:
         logger.error("CONFIG_PATH environment variable is not set")
         raise ValueError("CONFIG_PATH not set in environment variables")
 
-    logger.info(f"Attempting to load config from: {config_path}")
+    logger.info("Attempting to load config from: %s", config_path)
 
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, 'r', encoding='utf-8') as f:
             raw_content = f.read()
             return {
                 "content": raw_content
             }
-    except FileNotFoundError:
-        logger.error(f"Config file not found at path: {config_path}")
-        raise ValueError(f"Config file not found at {config_path}")
+    except FileNotFoundError as exc:
+        logger.error("Config file not found at path: %s", config_path)
+        raise ValueError(f"Config file not found at {config_path}") from exc
     except Exception as e:
-        logger.error(f"Unexpected error loading config: {str(e)}")
-        raise ValueError(f"Error loading config: {str(e)}")
+        logger.error("Unexpected error loading config: %s", str(e))
+        raise ValueError(f"Error loading config: {str(e)}") from e
 
 
 def save_config(config_data: Dict[Any, Any]) -> None:
@@ -62,21 +63,18 @@ def save_config(config_data: Dict[Any, Any]) -> None:
     if not config_path:
         raise ValueError("CONFIG_PATH not set in environment variables")
 
-    # Validate JSON before saving
     try:
-        # Test if the data can be serialized
         json.dumps(config_data)
-    except (TypeError, json.JSONDecodeError):
-        raise ValueError("Invalid JSON data")
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("Invalid JSON data") from exc
 
-    with open(config_path, 'w') as f:
+    with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(config_data, f, indent=2)
 
 
 def format_uptime(uptime_str):
     """Convert .NET TimeSpan format to human readable format"""
     try:
-        # Split into days, hours, minutes, seconds
         parts = uptime_str.split('.')
         if len(parts) != 2:
             return uptime_str
@@ -86,14 +84,12 @@ def format_uptime(uptime_str):
         if len(time_parts) != 3:
             return uptime_str
 
-        hours, minutes, seconds = map(int, time_parts)
+        hours, minutes, _ = map(int, time_parts)  # Using _ for unused seconds
 
-        # Handle days if present
         if hours >= 24:
             days = hours // 24
             hours = hours % 24
 
-        # Build readable string
         components = []
         if days > 0:
             components.append(f"{days} {'day' if days == 1 else 'days'}")
@@ -103,7 +99,7 @@ def format_uptime(uptime_str):
             components.append(f"{minutes} {'minute' if minutes == 1 else 'minutes'}")
 
         return ' '.join(components) if components else "just started"
-    except:
+    except Exception:  # Specify the exception type
         return uptime_str
 
 
@@ -129,7 +125,7 @@ def parse_bans(output):
 
 @app.get("/")
 async def get():
-    with open("templates/index.html") as f:
+    with open("templates/index.html", encoding='utf-8') as f:
         return HTMLResponse(f.read())
 
 
@@ -204,9 +200,6 @@ async def websocket_endpoint(websocket: WebSocket):
                         status_output = podman_manager.send_command("status")
                         status_lines = status_output.split('\n')[1:-1]  # Remove command and prompt
 
-                        # Get the focused world name
-                        focused_world_name = status_lines[-1][:-1]
-
                         # Parse status output
                         status_data = {}
                         for line in status_lines:
@@ -238,7 +231,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         }
 
                         # Send the users command to the focused world
-                        users_output = podman_manager.send_command(f"users")
+                        users_output = podman_manager.send_command("users")  # Remove unnecessary f-string
                         # Remove command and prompt lines
                         users_lines = users_output.split('\n')[1:-1]
 
@@ -298,7 +291,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
 
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        logger.error("WebSocket error: %s", str(e))
     finally:
         active_connections.remove(websocket)
         monitor_task.cancel()
@@ -307,10 +300,9 @@ async def websocket_endpoint(websocket: WebSocket):
 async def is_websocket_connected(websocket: WebSocket) -> bool:
     """Check if the websocket is still connected"""
     try:
-        # Try sending a ping frame
         await websocket.send_bytes(b'')
         return True
-    except:
+    except WebSocketDisconnect:  # Specify the exact exception we expect
         return False
 
 
@@ -354,7 +346,7 @@ async def send_output(websocket: WebSocket, output):
                 "output": output
             })
     except Exception as e:
-        print(f"Error sending output: {e}")
+        logger.error("Error sending output: %s", str(e))
 
 
 @app.get("/config")
@@ -364,10 +356,10 @@ async def get_config():
         result = load_config()
         return JSONResponse(content=result)
     except ValueError as e:
-        logger.error(f"Error in get_config endpoint: {str(e)}")
+        logger.error("Error in get_config endpoint: %s", str(e))
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        logger.error(f"Unexpected error in get_config endpoint: {str(e)}")
+        logger.error("Unexpected error in get_config endpoint: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
