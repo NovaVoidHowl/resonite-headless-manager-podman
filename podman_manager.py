@@ -116,14 +116,30 @@ class PodmanManager:
         else:
           decoded_output = str(output).strip()
         
+        # Print full response for debugging
         logger.info("Command output length: %d chars", len(decoded_output))
-        if decoded_output:
-          logger.debug("Command output sample: %s", decoded_output[:200] if len(decoded_output) > 200 else decoded_output)
+        logger.info("FULL RESPONSE: %r", decoded_output)
+        
+        # Print detailed error information if command failed
+        if exit_code != 0:
+          logger.error("Command failed with exit code %d", exit_code)
+          logger.error("Error message: %s", decoded_output)
+          
+          # Try to get more container information
+          try:
+            logger.info("Container running processes:")
+            ps_result = container.exec_run(['ps', 'aux'])
+            if isinstance(ps_result, tuple) and len(ps_result) >= 2:
+              _, ps_output = ps_result
+              logger.info("Processes: %s", ps_output.decode('utf-8').strip() if isinstance(ps_output, bytes) else ps_output)
+          except Exception as ps_error:
+            logger.warning("Failed to get process info: %s", str(ps_error))
         
         return decoded_output
       else:
         # Handle case where the result is not a tuple
         logger.warning("exec_run returned unexpected format: %s", str(result))
+        logger.info("FULL RESPONSE (unexpected format): %r", result)
         
         # Try to extract output from the result
         if hasattr(result, 'output'):
