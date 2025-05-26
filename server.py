@@ -134,6 +134,298 @@ def parse_bans(output):
   return bans
 
 
+def parse_users(output):
+  """Parse the users command output into structured data"""
+  users = []
+  # Remove the first line if it contains the command
+  lines = output.split('\n')
+  if lines and "users" in lines[0]:
+    lines = lines[1:]
+  
+  # Filter out empty lines and command prompt
+  lines = [line for line in lines if line.strip() and not line.strip().endswith('>')]
+  
+  for line in lines:
+    line = line.strip()
+    if not line:
+      continue
+      
+    user_info = {}
+    # Split by spaces, but need to be careful as usernames might contain spaces
+    parts = line.split()
+    
+    # First get the username (everything before ID:)
+    name_parts = []
+    id_index = -1
+    for i, part in enumerate(parts):
+      if part == "ID:":
+        id_index = i
+        break
+      name_parts.append(part)
+    
+    if id_index >= 0:
+      # We found the ID: marker
+      user_info["name"] = " ".join(name_parts).strip()
+      
+      # Extract User ID - get the next part after "ID:"
+      if id_index + 1 < len(parts):
+        user_id = parts[id_index + 1]
+        user_info["user_id"] = user_id if user_id != "" else None
+      
+      # Extract Role
+      role_index = -1
+      for i, part in enumerate(parts):
+        if part == "Role:":
+          role_index = i
+          break
+      
+      if role_index >= 0 and role_index + 1 < len(parts):
+        user_info["role"] = parts[role_index + 1]
+      
+      # Extract Present status
+      present_index = -1
+      for i, part in enumerate(parts):
+        if part == "Present:":
+          present_index = i
+          break
+          
+      if present_index >= 0 and present_index + 1 < len(parts):
+        user_info["present"] = parts[present_index + 1].lower() == "true"
+      
+      # Extract Ping
+      ping_index = -1
+      for i, part in enumerate(parts):
+        if part == "Ping:":
+          ping_index = i
+          break
+          
+      if ping_index >= 0 and ping_index + 1 < len(parts):
+        try:
+          # Handle the "ms" suffix if present
+          ping = parts[ping_index + 1]
+          if parts[ping_index + 2] == "ms":
+            ping += " ms"
+          user_info["ping"] = ping
+        except IndexError:
+          user_info["ping"] = "0 ms"
+      
+      # Extract FPS
+      fps_index = -1
+      for i, part in enumerate(parts):
+        if part == "FPS:":
+          fps_index = i
+          break
+          
+      if fps_index >= 0 and fps_index + 1 < len(parts):
+        try:
+          fps = float(parts[fps_index + 1])
+          user_info["fps"] = round(fps, 2)  # Round to 2 decimal places
+        except (ValueError, IndexError):
+          user_info["fps"] = 0
+      
+      # Extract Silenced status
+      silenced_index = -1
+      for i, part in enumerate(parts):
+        if part == "Silenced:":
+          silenced_index = i
+          break
+          
+      if silenced_index >= 0 and silenced_index + 1 < len(parts):
+        user_info["silenced"] = parts[silenced_index + 1].lower() == "true"
+      
+      # Add the user if we have at least a name
+      if "name" in user_info:
+        users.append(user_info)
+    
+  return users
+
+
+def parse_worlds(output):
+  """Parse the worlds command output into structured data"""
+  worlds = []
+  # Remove the first line if it contains the command
+  lines = output.split('\n')
+  if lines and "worlds" in lines[0]:
+    lines = lines[1:]
+  
+  # Filter out empty lines and command prompt
+  lines = [line for line in lines if line.strip() and not line.strip().endswith('>')]
+  
+  # If no worlds, return empty array
+  if not lines or "No worlds running" in output:
+    return []
+  
+  # Process each world line
+  for line in lines:
+    line = line.strip()
+    if not line:
+      continue
+      
+    world_info = {}
+    
+    # Parse the index from within brackets [0]
+    index_match = re.match(r'\[(\d+)\]', line)
+    if index_match:
+      world_info["index"] = int(index_match.group(1))
+      
+      # Remove the index part to make parsing easier
+      line = line[line.find(']') + 1:].strip()
+    else:
+      # If no index found, assign a placeholder
+      world_info["index"] = -1
+    
+    # Split remaining into parts by common separators
+    parts = re.split(r'\s+', line)
+    
+    # First part is world name until we find "Users:"
+    name_parts = []
+    user_index = -1
+    for i, part in enumerate(parts):
+      if part == "Users:":
+        user_index = i
+        break
+      name_parts.append(part)
+    
+    # Store the name
+    if name_parts:
+      world_info["name"] = " ".join(name_parts).strip()
+    else:
+      world_info["name"] = f"World {world_info['index']}"
+    
+    # Extract users count
+    if user_index >= 0 and user_index + 1 < len(parts):
+      try:
+        world_info["users"] = int(parts[user_index + 1])
+      except ValueError:
+        world_info["users"] = 0
+    
+    # Extract present users count
+    present_index = -1
+    for i, part in enumerate(parts):
+      if part == "Present:":
+        present_index = i
+        break
+    
+    if present_index >= 0 and present_index + 1 < len(parts):
+      try:
+        world_info["present"] = int(parts[present_index + 1])
+      except ValueError:
+        world_info["present"] = 0
+    
+    # Extract access level
+    access_index = -1
+    for i, part in enumerate(parts):
+      if part == "AccessLevel:":
+        access_index = i
+        break
+    
+    if access_index >= 0 and access_index + 1 < len(parts):
+      world_info["accessLevel"] = parts[access_index + 1]
+    
+    # Extract max users
+    max_users_index = -1
+    for i, part in enumerate(parts):
+      if part == "MaxUsers:":
+        max_users_index = i
+        break
+    
+    if max_users_index >= 0 and max_users_index + 1 < len(parts):
+      try:
+        world_info["maxUsers"] = int(parts[max_users_index + 1])
+      except ValueError:
+        world_info["maxUsers"] = 0
+    
+    # Add to worlds list
+    worlds.append(world_info)
+  
+  return worlds
+
+
+def parse_status(output):
+  """Parse the status command output into structured data"""
+  # Remove the first line if it contains the command
+  lines = output.split('\n')
+  if lines and "status" in lines[0]:
+    lines = lines[1:]
+  
+  # Filter out empty lines and command prompt
+  lines = [line for line in lines if line.strip() and not line.strip().endswith('>')]
+  
+  # Initialize result dict
+  status_data = {}
+  
+  # Extract key-value pairs
+  for line in lines:
+    line = line.strip()
+    if not line or ":" not in line:
+      continue
+    
+    parts = line.split(":", 1)
+    if len(parts) == 2:
+      key = parts[0].strip()
+      value = parts[1].strip()
+      
+      # Convert certain fields to appropriate types
+      if key == "Current Users" or key == "Present Users" or key == "Max Users":
+        try:
+          value = int(value)
+        except ValueError:
+          # Keep as string if parsing fails
+          pass
+      elif key == "Hidden from listing" or key == "Mobile Friendly":
+        value = value.lower() == "true"
+      elif key == "Uptime":
+        # Keep as string but could be further processed
+        pass
+      
+      # Use camelCase keys for JSON consistency
+      key_mapping = {
+        "Name": "name",
+        "SessionID": "sessionId",
+        "Current Users": "users", 
+        "Present Users": "present",
+        "Max Users": "maxUsers",
+        "Uptime": "uptime",
+        "Access Level": "accessLevel",
+        "Hidden from listing": "hidden",
+        "Mobile Friendly": "mobileFriendly",
+        "Description": "description",
+        "Tags": "tags"
+      }
+      
+      # Add to status data
+      if key in key_mapping:
+        status_data[key_mapping[key]] = value
+      else:
+        # For any keys not in the mapping, convert to camelCase
+        camel_key = key.lower().replace(" ", "_")
+        status_data[camel_key] = value
+      
+      # Parse Users list if present
+      if key == "Users":
+        users = [u.strip() for u in value.split(",") if u.strip()]
+        status_data["usersList"] = users
+  
+  return status_data
+
+
+def clean_terminal_output(output):
+  """Remove ANSI escape sequences and other terminal control characters from output"""
+  import re
+  
+  # Remove ANSI escape sequences
+  ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+  output = ansi_escape.sub('', output)
+  
+  # Remove common prompt text
+  output = re.sub(r'Headless Software Debug do not join>', '', output)
+  
+  # Strip leading/trailing whitespace
+  output = output.strip()
+  
+  return output
+
+
 # Function to handle worlds command
 async def process_worlds_command(podman_manager):
     logger.info("Starting process_worlds_command")
@@ -530,18 +822,53 @@ async def monitor_podman_output(websocket: WebSocket):
 
 
 async def send_output(websocket: WebSocket, output):
-  """Send output to WebSocket"""
+  """Send output to WebSocket with improved formatting and structured data"""
   try:
     if await is_websocket_connected(websocket):
       # Ensure the output is properly encoded as JSON
       if not isinstance(output, str):
         output = str(output)
-
-      # Always send as JSON with proper structure
-      await websocket.send_json({
-        "type": "container_output",
-        "output": output
-      })
+      
+      # Clean terminal output of ANSI escape sequences and prompts
+      cleaned_output = clean_terminal_output(output)
+      
+      # Extract the first line to determine command type
+      first_line = cleaned_output.split("\n")[0] if cleaned_output else ""
+      
+      # Check if this is a known command output that should be structured
+      if "users" in first_line.lower():
+        # Parse users command output
+        users_data = parse_users(cleaned_output)
+        await websocket.send_json({
+          "type": "container_output",
+          "info_type": "users",
+          "user_list": users_data,
+          "raw_output": cleaned_output  # Include cleaned raw output for fallback
+        })
+      elif "worlds" in first_line.lower():
+        # Parse worlds command output
+        worlds_data = parse_worlds(cleaned_output)
+        await websocket.send_json({
+          "type": "container_output",
+          "info_type": "worlds",
+          "worlds_list": worlds_data,
+          "raw_output": cleaned_output  # Include cleaned raw output for fallback
+        })
+      elif "status" in first_line.lower():
+        # Parse status command output
+        status_data = parse_status(cleaned_output)
+        await websocket.send_json({
+          "type": "container_output",
+          "info_type": "status",
+          "status_data": status_data,
+          "raw_output": cleaned_output  # Include cleaned raw output for fallback
+        })
+      else:
+        # Regular terminal output
+        await websocket.send_json({
+          "type": "container_output",
+          "output": cleaned_output
+        })
   except Exception as e:
     logger.error(f"Error sending output: {e}")
     # Don't rethrow the exception to avoid crashing the WebSocket handler

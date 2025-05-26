@@ -224,7 +224,7 @@ function handleMessage(data) {
   }
 }
 
-// Helper function to process JSON messages once parsed
+// Update the processJsonMessage function to handle all structured data types
 function processJsonMessage(message) {
   // Make sure message is an object
   if (!message || typeof message !== 'object') {
@@ -264,8 +264,18 @@ function processJsonMessage(message) {
     }
 
   } else if (message.type === 'container_output') {
-    // Container output message
-    if (message.output) {
+    // Container output message with structured data
+    if (message.info_type === 'users' && Array.isArray(message.user_list)) {
+      // Handle structured user data
+      displayUsersList(message.user_list);
+    } else if (message.info_type === 'worlds' && Array.isArray(message.worlds_list)) {
+      // Handle structured worlds data
+      displayWorldsList(message.worlds_list);
+    } else if (message.info_type === 'status' && message.status_data) {
+      // Handle structured status data
+      displayWorldStatus(message.status_data);
+    } else if (message.output) {
+      // Regular output (unstructured)
       appendOutput(message.output);
     }
 
@@ -277,6 +287,123 @@ function processJsonMessage(message) {
     // Bans update message
     updateBansList(message.bans || []);
   }
+}
+
+/**
+ * Display structured user data in a formatted way
+ * @param {Array} users - Array of user objects with structured data
+ */
+function displayUsersList(users) {
+  if (!Array.isArray(users) || users.length === 0) {
+    appendOutput("No users found.");
+    return;
+  }
+
+  // Create a formatted table for the console output
+  let formattedOutput = "USERS LIST:\n";
+  formattedOutput += "-".repeat(80) + "\n";
+  formattedOutput += "Username".padEnd(20) + " | ";
+  formattedOutput += "User ID".padEnd(20) + " | ";
+  formattedOutput += "Role".padEnd(10) + " | ";
+  formattedOutput += "Present".padEnd(8) + " | ";
+  formattedOutput += "Ping".padEnd(8) + " | ";
+  formattedOutput += "FPS".padEnd(8) + " | ";
+  formattedOutput += "Silenced\n";
+  formattedOutput += "-".repeat(80) + "\n";
+
+  users.forEach(user => {
+    formattedOutput += (user.name || "Unknown").padEnd(20).substring(0, 19) + " | ";
+    formattedOutput += (user.user_id || "N/A").padEnd(20).substring(0, 19) + " | ";
+    formattedOutput += (user.role || "Unknown").padEnd(10).substring(0, 9) + " | ";
+    formattedOutput += (user.present ? "Yes" : "No").padEnd(8) + " | ";
+    formattedOutput += (user.ping || "0 ms").padEnd(8) + " | ";
+    formattedOutput += (user.fps ? user.fps.toString() : "0").padEnd(8) + " | ";
+    formattedOutput += (user.silenced ? "Yes" : "No") + "\n";
+  });
+
+  formattedOutput += "-".repeat(80) + "\n";
+  formattedOutput += `Total users: ${users.length}\n`;
+
+  appendOutput(formattedOutput);
+}
+
+/**
+ * Display structured worlds data in a formatted way
+ * @param {Array} worlds - Array of world objects with structured data
+ */
+function displayWorldsList(worlds) {
+  if (!Array.isArray(worlds) || worlds.length === 0) {
+    appendOutput("No worlds found.");
+    return;
+  }
+
+  // Create a formatted table for the console output
+  let formattedOutput = "WORLDS LIST:\n";
+  formattedOutput += "-".repeat(80) + "\n";
+  formattedOutput += "Index".padEnd(6) + " | ";
+  formattedOutput += "World Name".padEnd(25) + " | ";
+  formattedOutput += "Users".padEnd(7) + " | ";
+  formattedOutput += "Present".padEnd(8) + " | ";
+  formattedOutput += "Max".padEnd(5) + " | ";
+  formattedOutput += "Access Level".padEnd(15) + "\n";
+  formattedOutput += "-".repeat(80) + "\n";
+
+  worlds.forEach(world => {
+    formattedOutput += (world.index !== undefined ? world.index.toString() : "?").padEnd(6) + " | ";
+    formattedOutput += (world.name || "Unknown").padEnd(25).substring(0, 24) + " | ";
+    formattedOutput += (world.users !== undefined ? world.users.toString() : "0").padEnd(7) + " | ";
+    formattedOutput += (world.present !== undefined ? world.present.toString() : "0").padEnd(8) + " | ";
+    formattedOutput += (world.maxUsers !== undefined ? world.maxUsers.toString() : "0").padEnd(5) + " | ";
+    formattedOutput += (world.accessLevel || "Unknown").padEnd(15).substring(0, 14) + "\n";
+  });
+
+  formattedOutput += "-".repeat(80) + "\n";
+  formattedOutput += `Total worlds: ${worlds.length}\n`;
+
+  appendOutput(formattedOutput);
+}
+
+/**
+ * Display structured world status data in a formatted way
+ * @param {Object} status - World status object with structured data
+ */
+function displayWorldStatus(status) {
+  if (!status || typeof status !== 'object') {
+    appendOutput("No status data available.");
+    return;
+  }
+
+  // Create a formatted output for the console
+  let formattedOutput = "WORLD STATUS:\n";
+  formattedOutput += "-".repeat(80) + "\n";
+
+  // Basic info section
+  formattedOutput += "Name:            " + (status.name || "Unknown") + "\n";
+  formattedOutput += "Session ID:      " + (status.sessionId || "Unknown") + "\n";
+  formattedOutput += "Users:           " + (status.users !== undefined ? status.users : "0") + "\n";
+  formattedOutput += "Present Users:   " + (status.present !== undefined ? status.present : "0") + "\n";
+  formattedOutput += "Max Users:       " + (status.maxUsers !== undefined ? status.maxUsers : "0") + "\n";
+  formattedOutput += "Uptime:          " + (status.uptime || "Unknown") + "\n";
+  formattedOutput += "Access Level:    " + (status.accessLevel || "Unknown") + "\n";
+  formattedOutput += "Hidden:          " + (status.hidden === true ? "Yes" : "No") + "\n";
+  formattedOutput += "Mobile Friendly: " + (status.mobileFriendly === true ? "Yes" : "No") + "\n";
+  
+  // Description
+  if (status.description) {
+    formattedOutput += "Description:     " + status.description + "\n";
+  }
+  
+  // Tags
+  if (status.tags) {
+    formattedOutput += "Tags:            " + status.tags + "\n";
+  }
+  
+  // Users list
+  if (status.usersList && Array.isArray(status.usersList) && status.usersList.length > 0) {
+    formattedOutput += "\nUsers in world: " + status.usersList.join(", ") + "\n";
+  }
+
+  appendOutput(formattedOutput);
 }
 
 // Add function to copy world information to clipboard
