@@ -4,3 +4,5 @@ uvicorn[standard]
 asyncio
 python-dotenv
 psutil
+requests
+requests-unixsocket

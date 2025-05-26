@@ -5,7 +5,17 @@ from threading import Lock
 import logging
 import threading
 import podman
-import io
+import requests
+import json
+import urllib.parse
+import os
+
+# Try to import requests_unixsocket for Unix socket communication
+try:
+    import requests_unixsocket
+    HAS_UNIXSOCKET_SUPPORT = True
+except ImportError:
+    HAS_UNIXSOCKET_SUPPORT = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,12 +31,14 @@ class PodmanManager:
     self.ansi_escape = re.compile(r'(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]|\x1B[()][AB012]')
     self._monitor_running = False
     self.client = None
+    self.api_base_url = None
+    self.container_id = None
 
     # Initialize podman client
     self._init_client()
 
   def _init_client(self):
-    """Initialize the podman client"""
+    """Initialize the podman client and get API base URL"""
     connection_error = None
 
     # URI schemes according to Podman Python API docs
@@ -44,6 +56,10 @@ class PodmanManager:
 
         self.client = podman.PodmanClient(base_url=method["uri"])
 
+        # Extract API base URL for direct REST calls
+        self.api_base_url = self._get_api_url_from_uri(method["uri"])
+        logger.info("Direct API base URL: %s", self.api_base_url)
+
         # Test connection with ping and get container
         logger.info("Testing connection to %s", method['uri'])
         self.client.ping()
@@ -51,6 +67,7 @@ class PodmanManager:
 
         # Check if container exists and is accessible
         container = self.client.containers.get(self.container_name)
+        self.container_id = container.id  # Store container ID for API calls
         logger.info("Container found: %s (ID: %s)", container.name, container.id)
         logger.info("Container status: %s", container.status)
 
@@ -66,6 +83,37 @@ class PodmanManager:
 
     # Set a default client so the app doesn't crash completely
     self.client = podman.PodmanClient(base_url="http+unix:///run/podman/podman.sock")
+    self.api_base_url = "http+unix:///run/podman/podman.sock"
+
+  def _get_api_url_from_uri(self, uri):
+    """Convert Podman client URI to direct API URL"""
+    if uri.startswith("http+unix://"):
+      # For unix sockets, we need special handling
+      socket_path = uri.replace("http+unix://", "")
+      socket_path = urllib.parse.quote_plus(socket_path)
+      return f"http://localhost/v4.0.0"  # We'll handle the socket connection separately
+    elif uri.startswith("tcp://"):
+      # For TCP connections, we can use the URI directly
+      return uri.replace("tcp://", "http://") + "/v4.0.0"
+    return uri + "/v4.0.0"  # Default fallback
+
+  def _create_api_session(self):
+    """Create a requests session configured for the proper API endpoint"""
+    session = requests.Session()
+    if self.api_base_url.startswith("http://localhost/"):
+      # For Unix socket connections
+      socket_path = None
+      for uri in ["/run/podman/podman.sock", "/run/user/0/podman/podman.sock"]:
+        if os.path.exists(uri):
+          socket_path = uri
+          break
+
+      if not socket_path:
+        raise ValueError("Could not find Podman socket file")
+
+      session.mount("http://localhost/", requests_unixsocket.UnixAdapter(socket_path))
+
+    return session
 
   def clean_output(self, text):
     """Clean and format output text by removing ANSI sequences and handling line breaks"""
@@ -87,50 +135,81 @@ class PodmanManager:
       return list(self.output_buffer)[-count:]
 
   def send_command(self, command, timeout=5):
-    """
-    Send a command to the container's console using the attach method
-    as recommended in the Resonite Headless Server documentation
-    """
+    """Send a command to the container's console using the Podman API"""
     logger.info("Sending command to container: %s", command)
 
     try:
-      # Get container instance
+      # Get container instance to verify it exists
       container = self.client.containers.get(self.container_name)
       logger.info("Container verified: %s", container.name)
 
-      # Try using the attach method as recommended in Resonite docs
+      # Try the direct API approach
       try:
-        logger.info("Attempting to attach to container console")
+        # First test if we have requests_unixsocket for Unix socket connections
+        if not HAS_UNIXSOCKET_SUPPORT:
+          logger.warning("Missing requests_unixsocket package for direct socket API calls")
+          logger.warning("Falling back to tty=True approach")
 
-        # Try to attach to the console
-        # Note: The API docs indicate this might raise NotImplementedError
-        output = container.attach(
-          stdout=True,
-          stderr=True,
-          stream=False,
-          logs=False  # Don't include previous logs
-        )
+        if HAS_UNIXSOCKET_SUPPORT and self.container_id:
+          # Try using direct API call to attach to the container
+          logger.info("Using direct Podman REST API to attach to container")
 
-        # If we got here, attach is implemented
-        logger.info("Successfully attached to container console")
+          # Create a session for API calls
+          session = self._create_api_session()
 
-        # Send the command and capture output
-        # This is where we would write to stdin and read from stdout
-        # But since the API might not support bidirectional communication,
-        # we'll need a different approach if we get here
+          # First check if the container has a TTY allocated
+          inspect_url = f"{self.api_base_url}/libpod/containers/{self.container_id}/json"
+          inspect_response = session.get(inspect_url)
 
-        # For now, fall back to our tty=True approach if attach works but
-        # doesn't allow us to send commands
-        logger.info("Attach worked but bidirectional communication not implemented")
+          if inspect_response.status_code == 200:
+            container_info = inspect_response.json()
+            has_tty = container_info.get("Config", {}).get("Tty", False)
+            logger.info("Container has TTY: %s", has_tty)
+
+            if has_tty:
+              # Container has a TTY, we can use the attach endpoint
+              attach_url = f"{self.api_base_url}/libpod/containers/{self.container_id}/attach"
+
+              # Send the command with a newline to the container's stdin
+              full_command = f"{command}\n"
+
+              # Make the API call to attach to the container
+              attach_response = session.post(
+                attach_url,
+                params={
+                  "stdin": "true",
+                  "stdout": "true",
+                  "stderr": "true",
+                  "logs": "false",
+                  "stream": "true"
+                },
+                data=full_command,
+                stream=True,
+                headers={"Content-Type": "text/plain"}
+              )
+
+              if attach_response.status_code == 200:
+                logger.info("Successfully attached to container and sent command")
+                # Process the response stream
+                output_buffer = []
+                for chunk in attach_response.iter_content(chunk_size=1024):
+                  if chunk:
+                    output_buffer.append(chunk.decode('utf-8'))
+
+                output = ''.join(output_buffer)
+                logger.info("Received %d bytes of output from attach", len(output))
+                return output
+              else:
+                logger.warning("Failed to attach to container API: %s", attach_response.text)
+
+        # If direct API approach failed or missing requests_unixsocket, fall back
+        logger.info("Direct API approach failed or not available, falling back to tty=True approach")
+
+      except Exception as api_error:
+        logger.warning("Error with direct API approach: %s", str(api_error))
         logger.info("Falling back to tty=True approach")
 
-      except NotImplementedError:
-        logger.info("Container attach method not implemented, falling back to tty=True approach")
-      except Exception as attach_error:
-        logger.warning("Error attaching to container: %s", str(attach_error))
-        logger.info("Falling back to tty=True approach")
-
-      # Fall back to our tty=True approach
+      # Fall back to tty=True approach
       # Create a command to send to the container's console
       stdin_cmd = ["bash", "-c", f"echo '{command}\\n' > /dev/tty"]
       logger.info("Using exec_run with tty=True and command: %s", stdin_cmd)
@@ -229,16 +308,6 @@ class PodmanManager:
       error_msg = str(e).strip() or "Unknown error"
       logger.error("Error sending command to container: %s", error_msg)
       return f"Error: {error_msg}"
-
-  # Let's also try implementing a direct attach-based approach as an alternative method
-  def send_command_attach(self, command, timeout=5):
-    """
-    Alternative method: Try to send a command using direct podman CLI attach
-    This is a backup method if the API-based approach doesn't work
-    """
-    # Note: This method is not currently used, but kept for reference
-    # and possible future implementation
-    pass
 
   def monitor_output(self, callback):
     """Monitor container output continuously using the Podman Python API logs method"""
