@@ -174,21 +174,42 @@ function sendWorldCommand(worldId, command, additionalData = {}) {
 // Update the handleMessage function to handle different message types and formats
 function handleMessage(data) {
   try {
+    // Check for empty or undefined data
+    if (!data) {
+      console.log('Received empty WebSocket message');
+      return;
+    }
+
     // Handle binary data or Blob objects
     if (data instanceof Blob) {
       // Convert blob to text and then parse
       data.text().then(text => {
         try {
+          // Check if the text is empty or whitespace
+          if (!text || !text.trim()) {
+            console.log('Received empty Blob message');
+            return;
+          }
+
           const message = JSON.parse(text);
           processJsonMessage(message);
         } catch (parseError) {
           console.error('Error parsing Blob message:', parseError);
+          console.log('Raw message content:', text);
           displayErrorMessage('Failed to parse server message');
+          hideLoadingOverlay(); // Ensure loading overlay is hidden on error
         }
       }).catch(error => {
         console.error('Error reading Blob data:', error);
         displayErrorMessage('Failed to process server message');
+        hideLoadingOverlay(); // Ensure loading overlay is hidden on error
       });
+      return;
+    }
+
+    // For string data, check if it's empty
+    if (typeof data === 'string' && !data.trim()) {
+      console.log('Received empty string message');
       return;
     }
 
@@ -197,12 +218,21 @@ function handleMessage(data) {
     processJsonMessage(message);
   } catch (error) {
     console.error('Error parsing message:', error);
+    console.log('Raw message content:', typeof data === 'string' ? data : '[non-string data]');
     displayErrorMessage('Failed to parse server message');
+    hideLoadingOverlay(); // Ensure loading overlay is hidden on error
   }
 }
 
 // Helper function to process JSON messages once parsed
 function processJsonMessage(message) {
+  // Make sure message is an object
+  if (!message || typeof message !== 'object') {
+    console.error('Invalid message format:', message);
+    hideLoadingOverlay();
+    return;
+  }
+
   // Handle different message types
   if (message.type === 'status' || message.type === 'status_update') {
     // Status message

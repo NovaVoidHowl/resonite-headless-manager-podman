@@ -353,19 +353,50 @@ async def get():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
   await websocket.accept()
+  logger.info("connection open")
   active_connections.append(websocket)
 
   monitor_task = None
   try:
     # Start monitoring Podman output in a separate task
+    logger.info("Starting container log monitoring")
     monitor_task = asyncio.create_task(monitor_podman_output(websocket))
 
     # Handle incoming messages
     while True:
       try:
-        message = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)  # Add timeout
+        # Receive the message with a timeout to handle stalled connections
+        message = await asyncio.wait_for(websocket.receive(), timeout=30.0)
+
+        # Check if we got text or bytes (binary) data
+        if "text" in message:
+            data_str = message["text"]
+            is_binary = False
+        elif "bytes" in message:
+            data_str = message["bytes"].decode("utf-8")
+            is_binary = True
+        else:
+            # Unrecognized message format
+            logger.warning("Unrecognized WebSocket message format")
+            continue
+
+        # Skip empty messages
+        if not data_str or not data_str.strip():
+            logger.debug("Received empty WebSocket message, skipping")
+            continue
+
         try:
-          data = json.loads(message)
+          # Parse the message as JSON
+          data = json.loads(data_str)
+
+          # Validate message structure
+          if not isinstance(data, dict) or "type" not in data:
+              await websocket.send_json({
+                  "type": "error",
+                  "message": "Invalid message format: missing 'type' field"
+              })
+              continue
+
           if data["type"] == "command":
             # Execute command and send response
             output = podman_manager.send_command(data["command"])
@@ -421,24 +452,44 @@ async def websocket_endpoint(websocket: WebSocket):
                 "type": "error",
                 "message": f"Error processing worlds: {str(world_error)}"
               })
-        except json.JSONDecodeError:
+          else:
+              # Unknown message type
+              logger.warning(f"Received unknown message type: {data['type']}")
+              await websocket.send_json({
+                  "type": "error",
+                  "message": f"Unknown message type: {data['type']}"
+              })
+        except json.JSONDecodeError as json_err:
+          logger.error(f"JSON parsing error: {json_err}, data: {data_str[:100]}")
           await websocket.send_json({
             "type": "error",
-            "message": "Invalid message format"
+            "message": "Invalid JSON format in message"
+          })
+        except KeyError as key_err:
+          logger.error(f"Missing required field in message: {key_err}")
+          await websocket.send_json({
+            "type": "error",
+            "message": f"Missing required field in message: {key_err}"
           })
       except asyncio.TimeoutError:
-        # Handle timeout gracefully - just continue the loop
+        # Just a regular timeout, no need to log or send error
         continue
       except Exception as recv_error:
         logger.error("Error receiving websocket message: %s", str(recv_error))
+        # Check if websocket is still connected before trying to continue
         if not await is_websocket_connected(websocket):
+          logger.info("WebSocket connection closed")
           break
   except Exception as e:
-    print(f"WebSocket error: {e}")
+    logger.error(f"WebSocket error: {e}", exc_info=True)
   finally:
+    if websocket in active_connections:
+      active_connections.remove(websocket)
+
     if monitor_task:
       monitor_task.cancel()
-    monitor_task.cancel()
+
+    logger.info("connection closed")
 
 
 async def is_websocket_connected(websocket: WebSocket) -> bool:
