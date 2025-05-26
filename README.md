@@ -11,9 +11,7 @@
 -->
 
 > [!WARNING]
->
 > This software is currently in development and not yet ready for active use
->
 
 [![Contributors][contributors-shield]][contributors-url] [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url] [![Issues][issues-shield]][issues-url]
