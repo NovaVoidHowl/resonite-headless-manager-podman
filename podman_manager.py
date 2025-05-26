@@ -5,8 +5,6 @@ from threading import Lock
 import logging
 import threading
 import podman
-import subprocess
-import shlex
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -101,7 +99,8 @@ class PodmanManager:
 
       # Create a command that writes to the stdin of PID 1 (the main process)
       # The echo command sends our command string followed by a newline to stdin
-      stdin_cmd = f"echo '{command}' > /proc/1/fd/0"
+      # Add -e flag to echo to interpret backslash escapes like \n (newline)
+      stdin_cmd = f"echo -e '{command}\\n' > /proc/1/fd/0"
 
       logger.info("Executing stdin command via exec_run")
 
@@ -119,20 +118,20 @@ class PodmanManager:
 
         if exit_code != 0:
           logger.error("Failed to send command to container stdin: %r",
-                      output.decode('utf-8').strip() if isinstance(output, bytes) else output)
+                       output.decode('utf-8').strip() if isinstance(output, bytes) else output)
           return f"Error sending command: {output.decode('utf-8').strip() if isinstance(output, bytes) else output}"
 
       # Since the command is sent asynchronously to the container's console,
       # we need to wait a moment for it to process and then fetch the output
-      time.sleep(0.5)  # Give the container time to process the command
+      time.sleep(1.0)  # Give the container more time to process the command and generate output
 
       # Now get the recent logs to capture the output
       try:
-        # Get the last few lines from the container logs
+        # Get the last several lines from the container logs
         logs = container.logs(
           stdout=True,
           stderr=True,
-          tail=20,  # Get the last 20 lines which should include our command output
+          tail=50,  # Get more lines to ensure we capture the full response
           timestamps=False
         )
 
@@ -143,28 +142,39 @@ class PodmanManager:
 
         # Clean up the logs and extract relevant output
         clean_lines = self.clean_output(logs_text)
+        logger.debug("Raw log lines: %r", clean_lines)
 
-        # Look for lines after our command
+        # Look for the most recent occurrence of our command
         output_lines = []
-        command_found = False
+        command_index = -1
 
-        for line in clean_lines:
-          if command_found:
-            # Collect all lines after the command until we find a prompt or empty line
-            if line.endswith('>') or line.strip() == '':
-              break
-            output_lines.append(line)
-          elif line.lower().strip() == command.lower().strip():
-            # Found our command, start collecting output after this
-            command_found = True
+        # Find the last occurrence of our command
+        for i in range(len(clean_lines) - 1, -1, -1):
+            if clean_lines[i].lower().strip() == command.lower().strip():
+                command_index = i
+                break
 
-        # If we didn't find the command in the output, just return the last few lines
-        if not output_lines and clean_lines:
-          # Skip the last line if it looks like a prompt
-          if clean_lines[-1].endswith('>'):
-            output_lines = clean_lines[:-1][-5:]  # Get up to 5 lines before the prompt
-          else:
-            output_lines = clean_lines[-5:]  # Get the last 5 lines
+        if command_index != -1 and command_index < len(clean_lines) - 1:
+            # Start collecting lines after the command
+            start_collect = command_index + 1
+            end_collect = len(clean_lines)
+
+            # Find where the output ends (next prompt or empty line)
+            for i in range(start_collect, len(clean_lines)):
+                if clean_lines[i].endswith('>') or clean_lines[i].strip() == '':
+                    end_collect = i
+                    break
+
+            # Collect the output lines
+            output_lines = clean_lines[start_collect:end_collect]
+
+        # If we still don't have output, try a simpler approach
+        if not output_lines:
+            # Get all lines that don't look like commands or prompts
+            for line in clean_lines:
+                if not line.endswith('>') and line.strip() != command.strip():
+                    # This might be output content
+                    output_lines.append(line)
 
         output = '\n'.join(output_lines)
         logger.info("Command output: %s", output)
