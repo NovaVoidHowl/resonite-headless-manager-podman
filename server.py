@@ -99,7 +99,9 @@ def format_uptime(uptime_str):
       components.append(f"{minutes} {'minute' if minutes == 1 else 'minutes'}")
 
     return ' '.join(components) if components else "just started"
-  except Exception:  # Specify the exception type
+  except (ValueError, AttributeError, IndexError) as e:
+    # Handle specific exceptions that might occur during string parsing
+    logger.warning("Error parsing uptime string: %s", str(e))
     return uptime_str
 
 
@@ -129,172 +131,199 @@ async def get():
     return HTMLResponse(f.read())
 
 
+async def handle_command(websocket: WebSocket, command: str):
+  """Handle command execution and response"""
+  output = podman_manager.send_command(command)
+
+  if command == "listbans":
+    bans = parse_bans(output)
+    await websocket.send_json({
+      "type": "bans_update",
+      "bans": bans
+    })
+  else:
+    await websocket.send_json({
+      "type": "command_response",
+      "command": command,
+      "output": output
+    })
+
+
+async def handle_status(websocket: WebSocket):
+  """Handle status request and system metrics"""
+  status = podman_manager.get_container_status()
+  status_dict = dict(status)  # Convert to dictionary if it's not already
+
+  cpu_percent = psutil.cpu_percent(interval=1)
+  memory = psutil.virtual_memory()
+  memory_percent = memory.percent
+  memory_used = f"{memory.used / (1024 * 1024 * 1024):.1f}GB"
+  memory_total = f"{memory.total / (1024 * 1024 * 1024):.1f}GB"
+
+  # Create a new dictionary with all status data
+  full_status = {
+    **status_dict,
+    "cpu_usage": str(cpu_percent),  # Convert to string to match expected type
+    "memory_percent": str(memory_percent),
+    "memory_used": memory_used,
+    "memory_total": memory_total
+  }
+
+  await websocket.send_json({
+    "type": "status_update",
+    "status": full_status
+  })
+
+
+def parse_key_value(key: str, value: str) -> Any:
+  """Parse a specific key-value pair from user data"""
+  if key == "present":
+    return value.lower() == "true"
+  elif key == "ping":
+    try:
+      return int(value)
+    except ValueError:
+      return int(value.replace("ms", ""))
+  elif key == "fps":
+    return float(value)
+  elif key == "silenced":
+    return value.lower() == "true"
+  return value
+
+
+def parse_user_data(user_line: str) -> dict | None:
+  """Parse a single user line into structured data"""
+  line = user_line.strip()
+  if not line:
+    return None
+
+  user_info = {}
+  parts = line.split()
+  if not parts:
+    return None
+
+  user_info["username"] = parts[0]
+
+  # First pass - find user ID
+  for i, part in enumerate(parts):
+    if part == "ID:" and i + 1 < len(parts):
+      user_info["userId"] = parts[i + 1]
+      break
+
+  # Second pass - find all other key-value pairs
+  for i in range(len(parts)):
+    if parts[i].endswith(":") and i + 1 < len(parts):
+      key = parts[i][:-1].lower()
+      user_info[key] = parse_key_value(key, parts[i + 1])
+
+  return user_info
+
+
+async def get_world_users(world_index: int) -> list:
+  """Get users data for a specific world"""
+  podman_manager.send_command(f"focus {world_index}")
+  time.sleep(1)  # Allow time for focus to take effect
+
+  users_output = podman_manager.send_command("users")
+  users_lines = users_output.split('\n')[1:-1]
+
+  users_data = []
+  for user_line in users_lines:
+    user_info = parse_user_data(user_line)
+    if user_info:
+      users_data.append(user_info)
+
+  return users_data
+
+
+async def get_world_data(world_line: str, index: int) -> dict:
+  """Parse world data and get its details"""
+  podman_manager.send_command(f"focus {index}")
+  time.sleep(1)
+
+  status_output = podman_manager.send_command("status")
+  status_lines = status_output.split('\n')[1:-1]
+
+  status_data = {}
+  for line in status_lines:
+    if ': ' in line:
+      key, value = line.split(': ', 1)
+      status_data[key] = value
+
+  parts = world_line.split('\t')
+  name_part = parts[0]
+  users_index = name_part.find("Users:")
+  name = name_part[name_part.find(']') + 2:users_index].strip()
+
+  world_data = {
+    "name": name,
+    "sessionId": status_data.get("SessionID", ""),
+    "users": int(status_data.get("Current Users", 0)),
+    "present": int(status_data.get("Present Users", 0)),
+    "maxUsers": int(status_data.get("Max Users", 0)),
+    "uptime": format_uptime(status_data.get("Uptime", "")),
+    "accessLevel": status_data.get("Access Level", ""),
+    "hidden": status_data.get("Hidden from listing", "False") == "True",
+    "mobileFriendly": status_data.get("Mobile Friendly", "False") == "True",
+    "description": status_data.get("Description", ""),
+    "tags": status_data.get("Tags", "")
+  }
+
+  world_data["users_list"] = await get_world_users(index)
+  return world_data
+
+
+async def handle_worlds(websocket: WebSocket):
+  """Handle worlds request and data collection"""
+  worlds_output = podman_manager.send_command("worlds")
+  worlds_output = worlds_output.split('\n')[1:-1]
+
+  worlds = []
+  for i, world in enumerate(worlds_output):
+    world_data = await get_world_data(world, i)
+    worlds.append(world_data)
+
+  await websocket.send_json({
+    "type": "worlds_update",
+    "output": worlds
+  })
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+  """Handle WebSocket connections and message routing"""
   await websocket.accept()
   active_connections.append(websocket)
+  monitor_task = None
 
   try:
-    # Start monitoring Docker output in a separate task
     monitor_task = asyncio.create_task(monitor_docker_output(websocket))
 
-    # Handle incoming messages
     while True:
       message = await websocket.receive_text()
       try:
         data = json.loads(message)
+
         if data["type"] == "command":
-          # Execute command and send response
-          output = podman_manager.send_command(data["command"])
-
-          # Special handling for listbans command
-          if data["command"] == "listbans":
-            bans = parse_bans(output)
-            await websocket.send_json({
-              "type": "bans_update",
-              "bans": bans
-            })
-          else:
-            await websocket.send_json({
-              "type": "command_response",
-              "command": data["command"],
-              "output": output
-            })
+          await handle_command(websocket, data["command"])
         elif data["type"] == "get_status":
-          # Get container status and system metrics
-          status = podman_manager.get_container_status()
-
-          # Get system metrics
-          cpu_percent = psutil.cpu_percent(interval=1)
-          memory = psutil.virtual_memory()
-          memory_percent = memory.percent
-          memory_used = f"{memory.used / (1024 * 1024 * 1024):.1f}GB"
-          memory_total = f"{memory.total / (1024 * 1024 * 1024):.1f}GB"
-
-          # Add metrics to status response
-          status.update({
-            "cpu_usage": cpu_percent,
-            "memory_percent": memory_percent,
-            "memory_used": memory_used,
-            "memory_total": memory_total
-          })
-
-          await websocket.send_json({
-            "type": "status_update",
-            "status": status
-          })
+          await handle_status(websocket)
         elif data["type"] == "get_worlds":
-          worlds_output = podman_manager.send_command("worlds")
-
-          # Remove the command and the command prompt
-          worlds_output = worlds_output.split('\n')[1:-1]
-
-          worlds = []
-          for i, world in enumerate(worlds_output):
-            # First focus on this world
-            podman_manager.send_command(f"focus {i}")
-            # Add delay to prevent overwhelming the container
-            time.sleep(1)
-
-            # Get detailed status
-            status_output = podman_manager.send_command("status")
-            status_lines = status_output.split('\n')[1:-1]  # Remove command and prompt
-
-            # Parse status output
-            status_data = {}
-            for line in status_lines:
-              if ': ' in line:
-                key, value = line.split(': ', 1)
-                status_data[key] = value
-
-            # Split by tabs to separate the main sections (from original worlds command)
-            parts = world.split('\t')
-
-            # Extract name and index from the first part
-            name_part = parts[0]
-            users_index = name_part.find("Users:")
-            name = name_part[name_part.find(']') + 2:users_index].strip()
-
-            # Create world data combining both outputs
-            world_data = {
-              "name": name,
-              "sessionId": status_data.get("SessionID", ""),
-              "users": int(status_data.get("Current Users", 0)),
-              "present": int(status_data.get("Present Users", 0)),
-              "maxUsers": int(status_data.get("Max Users", 0)),
-              "uptime": format_uptime(status_data.get("Uptime", "")),
-              "accessLevel": status_data.get("Access Level", ""),
-              "hidden": status_data.get("Hidden from listing", "False") == "True",
-              "mobileFriendly": status_data.get("Mobile Friendly", "False") == "True",
-              "description": status_data.get("Description", ""),
-              "tags": status_data.get("Tags", "")
-            }
-
-            # Send the users command to the focused world
-            users_output = podman_manager.send_command("users")  # Remove unnecessary f-string
-            # Remove command and prompt lines
-            users_lines = users_output.split('\n')[1:-1]
-
-            # Parse users
-            users_data = []
-            for user_line in users_lines:
-              if user_line.strip():  # Skip empty lines
-                user_info = {}
-
-                # Split the line by spaces but handle the special case of ID field
-                parts = user_line.split()
-
-                # First part is always the username
-                user_info["username"] = parts[0]
-
-                # Look for "ID:" and get the next part
-                for i, part in enumerate(parts):
-                  if part == "ID:":
-                    if i + 1 < len(parts):
-                      user_info["userId"] = parts[i + 1]
-                    break
-
-                # Parse the rest of the key-value pairs
-                for i in range(len(parts)):
-                  if parts[i].endswith(":") and i + 1 < len(parts):
-                    key = parts[i][:-1].lower()  # Remove colon and convert to lowercase
-                    value = parts[i + 1]
-                    if key == "present":
-                      value = value.lower() == "true"
-                    elif key == "ping":
-                      try:
-                        value = int(value)
-                      except ValueError:
-                        # Handle case where ping has "ms" suffix
-                        value = int(value.replace("ms", ""))
-                    elif key == "fps":
-                      value = float(value)
-                    elif key == "silenced":
-                      value = value.lower() == "true"
-                    user_info[key] = value
-
-                users_data.append(user_info)
-
-            # Add users data to world_data
-            world_data["users_list"] = users_data
-
-            worlds.append(world_data)
-
-          await websocket.send_json({
-            "type": "worlds_update",
-            "output": worlds
-          })
+          await handle_worlds(websocket)
       except json.JSONDecodeError:
         await websocket.send_json({
           "type": "error",
           "message": "Invalid message format"
         })
 
-  except Exception as e:
-    logger.error("WebSocket error: %s", str(e))
+  except WebSocketDisconnect:
+    logger.info("WebSocket disconnected normally")
+  except (ConnectionError, TimeoutError) as e:
+    logger.error("WebSocket connection error: %s", str(e))
   finally:
     active_connections.remove(websocket)
-    monitor_task.cancel()
+    if monitor_task:
+      monitor_task.cancel()
 
 
 async def is_websocket_connected(websocket: WebSocket) -> bool:
@@ -345,7 +374,7 @@ async def send_output(websocket: WebSocket, output):
         "type": "container_output",
         "output": output
       })
-  except Exception as e:
+  except (WebSocketDisconnect, ConnectionError) as e:
     logger.error("Error sending output: %s", str(e))
 
 
@@ -357,10 +386,10 @@ async def get_config():
     return JSONResponse(content=result)
   except ValueError as e:
     logger.error("Error in get_config endpoint: %s", str(e))
-    raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=500, detail=str(e)) from e
   except Exception as e:
     logger.error("Unexpected error in get_config endpoint: %s", str(e))
-    raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+    raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}") from e
 
 
 @app.post("/config")
@@ -370,7 +399,7 @@ async def update_config(config_data: Dict[Any, Any]):
     save_config(config_data)
     return JSONResponse(content={"message": "Config updated successfully"})
   except ValueError as e:
-    raise HTTPException(status_code=400, detail=str(e))
+    raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.post("/api/world-properties")
@@ -385,8 +414,11 @@ async def update_world_properties(data: dict):
     # You'll need to send the appropriate commands to update each property
 
     return JSONResponse(content={"message": "Properties updated successfully"})
+  except (ValueError, KeyError) as e:
+    raise HTTPException(status_code=400, detail=str(e)) from e
   except Exception as e:
-    raise HTTPException(status_code=500, detail=str(e))
+    logger.error("Error updating world properties: %s", str(e))
+    raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/restart-container")
@@ -396,7 +428,8 @@ async def restart_container():
     podman_manager.restart_container()
     return JSONResponse(content={"message": "Container restart initiated"})
   except Exception as e:
-    raise HTTPException(status_code=500, detail=str(e))
+    logger.error("Error restarting container: %s", str(e))
+    raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 if __name__ == "__main__":
