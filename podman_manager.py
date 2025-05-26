@@ -125,28 +125,44 @@ class PodmanManager:
   def send_command(self, command, timeout=5):
     """Send a command to the container and return the output"""
     logger.info("Sending command to container: %s", command)
-
+    
     try:
       # Get container instance to verify it exists
       container = self.client.containers.get(self.container_name)
       logger.info("Container verified: %s", container.name)
-
+      
       # Try container.exec_run first (preferred method for podman-py)
       try:
         if hasattr(container, 'exec_run'):
           logger.info("Using exec_run to execute command: %s", command)
-          result = container.exec_run(command)
-          if result.exit_code == 0:
-            output = result.output.decode('utf-8').strip()
-            return output
+          # According to the official documentation, exec_run returns a tuple of (exit_code, output)
+          exec_result = container.exec_run(['bash', '-c', command])
+          
+          # Check if the result is a tuple as expected
+          if isinstance(exec_result, tuple) and len(exec_result) >= 2:
+            exit_code, output = exec_result
+            logger.info("exec_run returned exit_code: %s", exit_code)
+            
+            if exit_code == 0:
+              decoded_output = output.decode('utf-8').strip() if isinstance(output, bytes) else str(output).strip()
+              return decoded_output
+            else:
+              logger.warning("exec_run returned non-zero exit code: %d", exit_code)
           else:
-            logger.warning("exec_run returned non-zero exit code: %d", result.exit_code)
+            # Handle case where the API returns a different format
+            logger.warning("exec_run returned unexpected format: %s", str(exec_result))
+            
+            # Try to work with the result anyway
+            if hasattr(exec_result, 'output'):
+              output = exec_result.output
+              decoded_output = output.decode('utf-8').strip() if isinstance(output, bytes) else str(output).strip()
+              return decoded_output
       except Exception as exec_error:
         logger.warning("exec_run failed: %s", str(exec_error))
-
+      
       # Fall back to direct podman exec if exec_run fails
       return self._direct_podman_exec(command)
-
+    
     except Exception as e:
       error_msg = str(e).strip() or "Unknown error"
       logger.error("Error sending command to container: %s", error_msg)
