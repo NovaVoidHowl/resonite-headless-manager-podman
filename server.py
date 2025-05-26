@@ -5,7 +5,6 @@ import asyncio
 from podman_manager import PodmanManager
 import json
 import threading
-import time
 from dotenv import load_dotenv
 import os
 from typing import Dict, Any
@@ -48,7 +47,7 @@ def load_config() -> Dict[Any, Any]:
     logger.error("CONFIG_PATH environment variable is not set")
     raise ValueError("CONFIG_PATH not set in environment variables")
 
-  logger.info(f"Attempting to load config from: {config_path}")
+  logger.info("Attempting to load config from: %s", config_path)
 
   try:
     with open(config_path, 'r') as f:
@@ -57,10 +56,10 @@ def load_config() -> Dict[Any, Any]:
         "content": raw_content
       }
   except FileNotFoundError:
-    logger.error(f"Config file not found at path: {config_path}")
+    logger.error("Config file not found at path: %s", config_path)
     raise ValueError(f"Config file not found at {config_path}")
   except Exception as e:
-    logger.error(f"Unexpected error loading config: {str(e)}")
+    logger.error("Unexpected error loading config: %s", str(e))
     raise ValueError(f"Error loading config: {str(e)}")
 
 
@@ -300,7 +299,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 "output": worlds
               })
             except Exception as world_error:
-              logger.error(f"Error processing worlds: {str(world_error)}")
+              logger.error("Error processing worlds: %s", str(world_error))
               await websocket.send_json({
                 "type": "error",
                 "message": f"Error processing worlds: {str(world_error)}"
@@ -314,7 +313,7 @@ async def websocket_endpoint(websocket: WebSocket):
         # Handle timeout gracefully - just continue the loop
         continue
       except Exception as recv_error:
-        logger.error(f"Error receiving websocket message: {str(recv_error)}")
+        logger.error("Error receiving websocket message: %s", str(recv_error))
         if not await is_websocket_connected(websocket):
           break
   except Exception as e:
@@ -385,10 +384,10 @@ async def get_config():
     result = load_config()
     return JSONResponse(content=result)
   except ValueError as e:
-    logger.error(f"Error in get_config endpoint: {str(e)}")
+    logger.error("Error in get_config endpoint: %s", str(e))
     raise HTTPException(status_code=500, detail=str(e))
   except Exception as e:
-    logger.error(f"Unexpected error in get_config endpoint: {str(e)}")
+    logger.error("Unexpected error in get_config endpoint: %s", str(e))
     raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
