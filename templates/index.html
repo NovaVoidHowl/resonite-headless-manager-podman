@@ -15,6 +15,21 @@
 </head>
 
 <body>
+  <!-- Loading overlay -->
+  <div class="loading-overlay hidden">
+    <div class="loading-indicator"></div>
+    <div class="loading-text">Processing request...</div>
+  </div>
+
+  <!-- Error Toast -->
+  <div class="error-toast">
+    <div class="error-toast-message">An error occurred</div>
+    <button class="error-toast-close">&times;</button>
+  </div>
+
+  <!-- Copy Success Message -->
+  <div class="copy-success-message">Copied to clipboard!</div>
+
   <div class="status-bar">
     <div id="status" class="status-connecting">
       <span class="status-indicator"></span>
@@ -35,11 +50,9 @@
 
   <div class="layout-container">
     <div class="main-content">
-      <div id="worlds-container">
-        <div class="worlds-header">Active Worlds</div>
-        <div id="worlds-list">
-          <div class="worlds-loading">Loading worlds...</div>
-        </div>
+      <div class="container mt-3">
+        <h2>Resonite Headless Worlds</h2>
+        <div id="worlds-list" class="row"></div>
       </div>
     </div>
 

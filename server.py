@@ -134,6 +134,216 @@ def parse_bans(output):
   return bans
 
 
+# Function to handle worlds command
+async def process_worlds_command(podman_manager):
+    logger.info("Starting process_worlds_command")
+    try:
+        worlds_output = podman_manager.send_command("worlds")
+        logger.info(f"Raw worlds output: {worlds_output}")
+
+        # If no worlds are running, bail early
+        if "No worlds running" in worlds_output:
+            logger.info("No worlds running")
+            return []
+
+        # Remove the command and the command prompt
+        worlds_output = worlds_output.split('\n')
+        # Filter out empty lines and command prompts
+        worlds_output = [line for line in worlds_output if line.strip() and not line.strip().endswith('>')]
+        
+        # Remove the first line if it contains the command itself
+        if worlds_output and "worlds" in worlds_output[0]:
+            worlds_output = worlds_output[1:]
+            
+        logger.info(f"Parsed worlds output lines: {len(worlds_output)}")
+        logger.info(f"Worlds output: {worlds_output}")
+
+        # Double check - if we have no worlds after parsing, return empty list
+        if not worlds_output:
+            logger.warning("No worlds found after parsing output")
+            return []
+
+        worlds = []
+        for i, world in enumerate(worlds_output):
+            logger.info(f"Processing world {i}: {world}")
+            try:
+                # First focus on this world
+                focus_result = podman_manager.send_command(f"focus {i}")
+                logger.info(f"Focus result: {focus_result}")
+                
+                # Add delay to prevent overwhelming the container
+                await asyncio.sleep(0.5)
+
+                # Get detailed status
+                status_output = podman_manager.send_command("status")
+                logger.info(f"Status output for world {i}: {status_output}")
+                
+                # Skip if status command failed or returned nothing useful
+                if not status_output or "Unknown command" in status_output:
+                    logger.warning(f"Failed to get status for world {i}")
+                    continue
+                    
+                # Split the output into lines and remove empty lines and prompts
+                status_lines = [line for line in status_output.split('\n') 
+                                if line.strip() and not line.strip().endswith('>')]
+                
+                # Remove the command line if present
+                if status_lines and "status" in status_lines[0]:
+                    status_lines = status_lines[1:]
+
+                # Parse status output
+                status_data = {}
+                for line in status_lines:
+                    if ': ' in line:
+                        key, value = line.split(': ', 1)
+                        status_data[key.strip()] = value.strip()
+
+                logger.info(f"Parsed status data: {status_data}")
+                
+                # If status_data is empty, create minimal data to avoid skipping
+                if not status_data:
+                    logger.warning(f"Empty status data for world {i}, using minimal data")
+                    status_data = {
+                        "SessionID": f"world-{i}",  # Generate a placeholder ID
+                        "Current Users": "0",
+                        "Present Users": "0",
+                        "Max Users": "0",
+                        "Uptime": "0.00:00:00",
+                        "Access Level": "Unknown",
+                        "Hidden from listing": "False",
+                        "Mobile Friendly": "False"
+                    }
+
+                # Split by tabs to separate the main sections (from original worlds command)
+                parts = world.split('\t')
+
+                # Extract name and index from the first part
+                name_part = parts[0] if parts else world
+                users_index = name_part.find("Users:")
+                
+                # Handle case where "Users:" is not found
+                if users_index == -1:
+                    name = name_part.strip()
+                else:
+                    name = name_part[name_part.find(']') + 1:users_index].strip()
+                    # Clean up any remaining brackets
+                    if name.startswith('['):
+                        name = name[name.find(']') + 1:].strip()
+
+                # Ensure we have a name even if parsing failed
+                if not name:
+                    name = f"World {i}"
+
+                logger.info(f"Extracted name: '{name}'")
+
+                # Create world data combining both outputs
+                world_data = {
+                    "name": name,
+                    "sessionId": status_data.get("SessionID", f"world-{i}"),  # Ensure we have an ID
+                    "users": int(status_data.get("Current Users", "0").strip()),
+                    "present": int(status_data.get("Present Users", "0").strip()),
+                    "maxUsers": int(status_data.get("Max Users", "0").strip()),
+                    "uptime": format_uptime(status_data.get("Uptime", "")),
+                    "accessLevel": status_data.get("Access Level", ""),
+                    "hidden": status_data.get("Hidden from listing", "False").strip() == "True",
+                    "mobileFriendly": status_data.get("Mobile Friendly", "False").strip() == "True",
+                    "description": status_data.get("Description", ""),
+                    "tags": status_data.get("Tags", ""),
+                    "index": i  # Store the original world index
+                }
+                logger.info(f"Created world data: {world_data}")
+
+                # Send the users command to the focused world
+                users_output = podman_manager.send_command("users")
+                logger.info(f"Users output for world {i}: {users_output}")
+                
+                # Remove command and prompt lines
+                users_lines = [line for line in users_output.split('\n') 
+                              if line.strip() and not line.strip().endswith('>')]
+                
+                # Remove the command line if present
+                if users_lines and "users" in users_lines[0]:
+                    users_lines = users_lines[1:]
+                    
+                logger.info(f"Parsed users lines: {users_lines}")
+
+                # Parse users
+                users_data = []
+                for user_line in users_lines:
+                    if user_line.strip():  # Skip empty lines
+                        user_info = {}
+
+                        # Split the line by spaces but handle the special case of ID field
+                        parts = user_line.split()
+
+                        # First part is always the username
+                        user_info["username"] = parts[0] if parts else ""
+
+                        # Look for "ID:" and get the next part
+                        for i, part in enumerate(parts):
+                            if part == "ID:":
+                                if i + 1 < len(parts):
+                                    user_info["userId"] = parts[i + 1]
+                                break
+
+                        # Parse the rest of the key-value pairs
+                        for i in range(len(parts)):
+                            if parts[i].endswith(":") and i + 1 < len(parts):
+                                key = parts[i][:-1].lower()  # Remove colon and convert to lowercase
+                                value = parts[i + 1]
+                                if key == "present":
+                                    value = value.lower() == "true"
+                                elif key == "ping":
+                                    try:
+                                        value = int(value)
+                                    except ValueError:
+                                        # Handle case where ping has "ms" suffix
+                                        value = int(value.replace("ms", "")) if "ms" in value else 0
+                                elif key == "fps":
+                                    try:
+                                        value = float(value)
+                                    except ValueError:
+                                        value = 0.0
+                                elif key == "silenced":
+                                    value = value.lower() == "true"
+                                user_info[key] = value
+
+                        users_data.append(user_info)
+
+                # Add users data to world_data
+                world_data["users_list"] = users_data
+                logger.info(f"Added {len(users_data)} users to world")
+
+                worlds.append(world_data)
+            except Exception as world_error:
+                logger.error(f"Error processing world {i}: {str(world_error)}", exc_info=True)
+                # Still try to add minimal world info
+                try:
+                    worlds.append({
+                        "name": f"World {i}",
+                        "sessionId": f"world-{i}",
+                        "users": 0,
+                        "present": 0,
+                        "maxUsers": 0,
+                        "uptime": "unknown",
+                        "accessLevel": "Unknown",
+                        "hidden": False,
+                        "mobileFriendly": False,
+                        "index": i,
+                        "users_list": []
+                    })
+                except:
+                    pass
+
+        logger.info(f"Final worlds list: {len(worlds)} worlds")
+        for i, world in enumerate(worlds):
+            logger.info(f"World {i}: {world['name']} (sessionId: {world['sessionId']})")
+        return worlds
+    except Exception as e:
+        logger.error(f"Error in process_worlds_command: {str(e)}", exc_info=True)
+        return []
+
+
 @app.get("/")
 async def get():
   with open("templates/index.html") as f:
@@ -198,105 +408,12 @@ async def websocket_endpoint(websocket: WebSocket):
             })
           elif data["type"] == "get_worlds":
             try:
-              worlds_output = podman_manager.send_command("worlds")
-
-              # Remove the command and the command prompt
-              worlds_output = worlds_output.split('\n')[1:-1]
-
-              worlds = []
-              for i, world in enumerate(worlds_output):
-                # First focus on this world
-                podman_manager.send_command(f"focus {i}")
-                # Add delay to prevent overwhelming the container
-                await asyncio.sleep(1)  # Use asyncio.sleep instead of time.sleep
-
-                # Get detailed status
-                status_output = podman_manager.send_command("status")
-                status_lines = status_output.split('\n')[1:-1]  # Remove command and prompt
-
-                # Parse status output
-                status_data = {}
-                for line in status_lines:
-                  if ': ' in line:
-                    key, value = line.split(': ', 1)
-                    status_data[key] = value
-
-                # Split by tabs to separate the main sections (from original worlds command)
-                parts = world.split('\t')
-
-                # Extract name and index from the first part
-                name_part = parts[0]
-                users_index = name_part.find("Users:")
-                name = name_part[name_part.find(']') + 2:users_index].strip()
-
-                # Create world data combining both outputs
-                world_data = {
-                  "name": name,
-                  "sessionId": status_data.get("SessionID", ""),
-                  "users": int(status_data.get("Current Users", 0)),
-                  "present": int(status_data.get("Present Users", 0)),
-                  "maxUsers": int(status_data.get("Max Users", 0)),
-                  "uptime": format_uptime(status_data.get("Uptime", "")),
-                  "accessLevel": status_data.get("Access Level", ""),
-                  "hidden": status_data.get("Hidden from listing", "False") == "True",
-                  "mobileFriendly": status_data.get("Mobile Friendly", "False") == "True",
-                  "description": status_data.get("Description", ""),
-                  "tags": status_data.get("Tags", "")
-                }
-
-                # Send the users command to the focused world
-                users_output = podman_manager.send_command("users")
-                # Remove command and prompt lines
-                users_lines = users_output.split('\n')[1:-1]
-
-                # Parse users
-                users_data = []
-                for user_line in users_lines:
-                  if user_line.strip():  # Skip empty lines
-                    user_info = {}
-
-                    # Split the line by spaces but handle the special case of ID field
-                    parts = user_line.split()
-
-                    # First part is always the username
-                    user_info["username"] = parts[0]
-
-                    # Look for "ID:" and get the next part
-                    for i, part in enumerate(parts):
-                      if part == "ID:":
-                        if i + 1 < len(parts):
-                          user_info["userId"] = parts[i + 1]
-                        break
-
-                    # Parse the rest of the key-value pairs
-                    for i in range(len(parts)):
-                      if parts[i].endswith(":") and i + 1 < len(parts):
-                        key = parts[i][:-1].lower()  # Remove colon and convert to lowercase
-                        value = parts[i + 1]
-                        if key == "present":
-                          value = value.lower() == "true"
-                        elif key == "ping":
-                          try:
-                            value = int(value)
-                          except ValueError:
-                            # Handle case where ping has "ms" suffix
-                            value = int(value.replace("ms", ""))
-                        elif key == "fps":
-                          value = float(value)
-                        elif key == "silenced":
-                          value = value.lower() == "true"
-                        user_info[key] = value
-
-                    users_data.append(user_info)
-
-                # Add users data to world_data
-                world_data["users_list"] = users_data
-
-                worlds.append(world_data)
-
+              worlds = await process_worlds_command(podman_manager)
+              logger.info(f"Sending worlds update with {len(worlds)} worlds")
+              # Send the worlds data with a clearer structure
               await websocket.send_json({
                 "type": "worlds_update",
-                "output": worlds
+                "worlds": worlds  # Changed from "output" to "worlds" for clarity
               })
             except Exception as world_error:
               logger.error("Error processing worlds: %s", str(world_error))
@@ -409,11 +526,41 @@ async def update_world_properties(data: dict):
     if not session_id:
       raise HTTPException(status_code=400, detail="Session ID is required")
 
-    # TODO: Implement the actual property updates using podman_manager
-    # You'll need to send the appropriate commands to update each property
+    # Find the world index by sessionId
+    worlds = await process_worlds_command(podman_manager)
+    world_index = None
+    for world in worlds:
+      if world.get('sessionId') == session_id:
+        world_index = world.get('index')
+        break
 
+    if world_index is None:
+      raise HTTPException(status_code=404, detail="World not found")
+
+    # Focus on the specific world
+    podman_manager.send_command(f"focus {world_index}")
+    
+    # Update each property if provided
+    if 'name' in data:
+      podman_manager.send_command(f"worldname \"{data['name']}\"")
+      
+    if 'description' in data:
+      podman_manager.send_command(f"description \"{data['description']}\"")
+      
+    if 'accessLevel' in data:
+      podman_manager.send_command(f"access {data['accessLevel']}")
+      
+    if 'maxUsers' in data:
+      podman_manager.send_command(f"maxusers {data['maxUsers']}")
+      
+    if 'hidden' in data:
+      hidden_value = "true" if data['hidden'] else "false"
+      podman_manager.send_command(f"hidden {hidden_value}")
+
+    logger.info(f"Updated properties for world with sessionId: {session_id}")
     return JSONResponse(content={"message": "Properties updated successfully"})
   except Exception as e:
+    logger.error(f"Error updating world properties: {str(e)}")
     raise HTTPException(status_code=500, detail=str(e))
 
 
