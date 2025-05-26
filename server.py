@@ -165,8 +165,8 @@ async def handle_status(websocket: WebSocket):
   # Create a new dictionary with all status data
   full_status = {
     **status_dict,
-    "cpu_usage": str(cpu_percent),  # Convert to string to match expected type
-    "memory_percent": str(memory_percent),
+    "cpu_usage": cpu_percent,  # Send as number instead of string
+    "memory_percent": memory_percent,  # Send as number instead of string
     "memory_used": memory_used,
     "memory_total": memory_total
   }
