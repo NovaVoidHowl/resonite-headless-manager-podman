@@ -5,6 +5,8 @@ from threading import Lock
 import logging
 import threading
 import podman
+import subprocess
+import shlex
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -86,71 +88,92 @@ class PodmanManager:
       return list(self.output_buffer)[-count:]
 
   def send_command(self, command, timeout=5):
-    """Send a command to the container and return the output"""
+    """Send a command to the container's console using the Podman Python API"""
     logger.info("Sending command to container: %s", command)
-    
+
     try:
       # Get container instance
       container = self.client.containers.get(self.container_name)
       logger.info("Container verified: %s", container.name)
-      
-      # Use exec_run to execute the command inside the container
-      logger.info("Using exec_run with direct command: %s", command)
-      
-      # For Resonite Headless container, send the command directly without shell wrapper
+
+      # For Resonite Headless container, we need to interact with its console by
+      # sending commands to stdin of the main process
+
+      # Create a command that writes to the stdin of PID 1 (the main process)
+      # The echo command sends our command string followed by a newline to stdin
+      stdin_cmd = f"echo '{command}' > /proc/1/fd/0"
+
+      logger.info("Executing stdin command via exec_run")
+
+      # Use exec_run with the appropriate parameters to send the command
       result = container.exec_run(
-        cmd=command,  # Send command as is, without bash/sh wrapper
+        cmd=["bash", "-c", stdin_cmd],
         stdout=True,
-        stderr=True,
-        tty=True
+        stderr=True
       )
-      
+
       # Process the result
       if isinstance(result, tuple) and len(result) >= 2:
         exit_code, output = result
-        logger.info("exec_run returned exit_code: %s", exit_code)
-        
-        # Log and decode output
-        if isinstance(output, bytes):
-          decoded_output = output.decode('utf-8').strip()
-        else:
-          decoded_output = str(output).strip()
-        
-        # Print full response for debugging
-        logger.info("Command output length: %d chars", len(decoded_output))
-        logger.info("FULL RESPONSE: %r", decoded_output)
-        
-        # Print detailed error information if command failed
+        logger.info("stdin command execution returned exit_code: %s", exit_code)
+
         if exit_code != 0:
-          logger.error("Command failed with exit code %d", exit_code)
-          logger.error("Error message: %s", decoded_output)
-          
-          # Try to get more container information
-          try:
-            logger.info("Container running processes:")
-            ps_result = container.exec_run(['ps', 'aux'])
-            if isinstance(ps_result, tuple) and len(ps_result) >= 2:
-              _, ps_output = ps_result
-              logger.info("Processes: %s", ps_output.decode('utf-8').strip() if isinstance(ps_output, bytes) else ps_output)
-          except Exception as ps_error:
-            logger.warning("Failed to get process info: %s", str(ps_error))
-        
-        return decoded_output
-      else:
-        # Handle case where the result is not a tuple
-        logger.warning("exec_run returned unexpected format: %s", str(result))
-        logger.info("FULL RESPONSE (unexpected format): %r", result)
-        
-        # Try to extract output from the result
-        if hasattr(result, 'output'):
-          output = result.output
-          if isinstance(output, bytes):
-            return output.decode('utf-8').strip()
-          return str(output).strip()
-        
-        # Last resort - convert the whole result to string
-        return str(result).strip()
-    
+          logger.error("Failed to send command to container stdin: %r",
+                      output.decode('utf-8').strip() if isinstance(output, bytes) else output)
+          return f"Error sending command: {output.decode('utf-8').strip() if isinstance(output, bytes) else output}"
+
+      # Since the command is sent asynchronously to the container's console,
+      # we need to wait a moment for it to process and then fetch the output
+      time.sleep(0.5)  # Give the container time to process the command
+
+      # Now get the recent logs to capture the output
+      try:
+        # Get the last few lines from the container logs
+        logs = container.logs(
+          stdout=True,
+          stderr=True,
+          tail=20,  # Get the last 20 lines which should include our command output
+          timestamps=False
+        )
+
+        if isinstance(logs, bytes):
+          logs_text = logs.decode('utf-8')
+        else:
+          logs_text = str(logs)
+
+        # Clean up the logs and extract relevant output
+        clean_lines = self.clean_output(logs_text)
+
+        # Look for lines after our command
+        output_lines = []
+        command_found = False
+
+        for line in clean_lines:
+          if command_found:
+            # Collect all lines after the command until we find a prompt or empty line
+            if line.endswith('>') or line.strip() == '':
+              break
+            output_lines.append(line)
+          elif line.lower().strip() == command.lower().strip():
+            # Found our command, start collecting output after this
+            command_found = True
+
+        # If we didn't find the command in the output, just return the last few lines
+        if not output_lines and clean_lines:
+          # Skip the last line if it looks like a prompt
+          if clean_lines[-1].endswith('>'):
+            output_lines = clean_lines[:-1][-5:]  # Get up to 5 lines before the prompt
+          else:
+            output_lines = clean_lines[-5:]  # Get the last 5 lines
+
+        output = '\n'.join(output_lines)
+        logger.info("Command output: %s", output)
+        return output
+
+      except Exception as log_error:
+        logger.error("Error retrieving command output: %s", str(log_error))
+        return "Command sent, but could not retrieve output"
+
     except Exception as e:
       error_msg = str(e).strip() or "Unknown error"
       logger.error("Error sending command to container: %s", error_msg)
