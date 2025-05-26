@@ -286,6 +286,13 @@ function processJsonMessage(message) {
   } else if (message.type === 'bans_update') {
     // Bans update message
     updateBansList(message.bans || []);
+  } else if (message.content !== undefined) {
+    // Handle config content response
+    const configEditor = document.getElementById('config-editor');
+    if (configEditor) {
+      configEditor.value = message.content || '';
+      hideLoadingOverlay();
+    }
   }
 }
 
@@ -295,18 +302,18 @@ function processJsonMessage(message) {
  */
 function appendOutput(text) {
   if (!output) return;
-  
+
   // Check if we need to add a newline before appending
   if (output.innerHTML && !output.innerHTML.endsWith('\n') && !output.innerHTML.endsWith('<br>')) {
     output.innerHTML += '\n';
   }
-  
+
   // Replace newlines with <br> for HTML display
   const formattedText = text.replace(/\n/g, '<br>');
-  
+
   // Append the formatted text to the output element
   output.innerHTML += formattedText;
-  
+
   // Auto-scroll to bottom
   output.scrollTop = output.scrollHeight;
 }
@@ -409,17 +416,17 @@ function displayWorldStatus(status) {
   formattedOutput += "Access Level:    " + (status.accessLevel || "Unknown") + "\n";
   formattedOutput += "Hidden:          " + (status.hidden === true ? "Yes" : "No") + "\n";
   formattedOutput += "Mobile Friendly: " + (status.mobileFriendly === true ? "Yes" : "No") + "\n";
-  
+
   // Description
   if (status.description) {
     formattedOutput += "Description:     " + status.description + "\n";
   }
-  
+
   // Tags
   if (status.tags) {
     formattedOutput += "Tags:            " + status.tags + "\n";
   }
-  
+
   // Users list
   if (status.usersList && Array.isArray(status.usersList) && status.usersList.length > 0) {
     formattedOutput += "\nUsers in world: " + status.usersList.join(", ") + "\n";
@@ -507,7 +514,7 @@ function toggleConsole() {
   const consoleSection = document.querySelector('.console-section');
   const toggleButton = document.querySelector('.toggle-console');
   const icon = toggleButton.querySelector('.icon');
-  
+
   // Toggle visibility
   if (consoleSection.style.display === 'block') {
     consoleSection.style.display = 'none';
@@ -517,7 +524,7 @@ function toggleConsole() {
     consoleSection.style.display = 'block';
     toggleButton.classList.add('expanded');
     icon.textContent = '▲';
-    
+
     // Auto-focus the input field when opening console
     setTimeout(() => {
       const commandInput = document.getElementById('command-input');
@@ -535,7 +542,7 @@ function toggleConfig() {
   const configSection = document.querySelector('.config-section');
   const toggleButton = document.querySelector('button:nth-child(2)');
   const icon = toggleButton.querySelector('.icon');
-  
+
   // Toggle visibility
   if (configSection.style.display === 'block') {
     configSection.style.display = 'none';
@@ -545,7 +552,7 @@ function toggleConfig() {
     configSection.style.display = 'block';
     toggleButton.classList.add('expanded');
     icon.textContent = '▲';
-    
+
     // Fetch config when opening the editor
     sendCommand(JSON.stringify({ command: 'get_config' }));
   }
