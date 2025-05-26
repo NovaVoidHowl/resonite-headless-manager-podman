@@ -194,7 +194,7 @@ Without the above, this project would not exist!
 [forks-url]: https://github.com/NovaVoidHowl/resonite-headless-manager-podman/network/members
 [issues-shield]: https://img.shields.io/github/issues/NovaVoidHowl/resonite-headless-manager-podman.svg?style=plastic
 [issues-url]: https://github.com/NovaVoidHowl/resonite-headless-manager-podman/issues
-[license-shield]: https://img.shields.io/badge/License-LGPL_2.1-blue
+[license-shield]: https://img.shields.io/badge/License-MIT-blue
 [license-url]: https://github.com/NovaVoidHowl/resonite-headless-manager-podman/blob/main/LICENSE
 [stars-shield]: https://img.shields.io/github/stars/NovaVoidHowl/resonite-headless-manager-podman.svg?style=plastic
 [stars-url]: https://github.com/NovaVoidHowl/resonite-headless-manager-podman/stargazers
