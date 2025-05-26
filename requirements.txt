@@ -1,7 +1,7 @@
 docker
 podman
 fastapi
-uvicorn
+uvicorn[standard]
 asyncio
 python-dotenv
 psutil
