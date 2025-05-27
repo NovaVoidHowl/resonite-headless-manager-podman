@@ -116,37 +116,44 @@ class PodmanManager:
 
     return process
 
+  def _process_users_command(self, clean_lines: List[str]) -> List[str]:
+    """Process output specifically for the users command"""
+    response_lines = []
+    start_idx = 1 if len(clean_lines) > 0 and 'Username' in clean_lines[0] else 0
+    for line in clean_lines[start_idx:]:
+      if not line or '>' in line:
+        break
+      if line.strip():  # Only add non-empty lines
+        response_lines.append(line)
+    return response_lines
+
+  def _process_generic_command(self, clean_lines: List[str], command: str) -> List[str]:
+    """Process output for general commands"""
+    response_lines = []
+    capture_started = False
+    for line in clean_lines:
+      if not capture_started and command.strip() in line:
+        capture_started = True
+      elif capture_started and '>' in line:
+        break
+      elif capture_started:
+        response_lines.append(line)
+    return response_lines
+
   def _process_command_output(self, output: str, command: str) -> str:
     """Process and parse command output."""
     clean_lines = self.clean_output(output)
     logger.info("Captured %d lines of output", len(clean_lines))
 
     response_lines = []
-    
-    # Special handling for the users command
     if command.strip() == 'users':
-        # For users command, skip the first line (header) if it exists
-        # and collect all lines until we hit a prompt or empty line
-        start_idx = 1 if len(clean_lines) > 0 and 'Username' in clean_lines[0] else 0
-        for line in clean_lines[start_idx:]:
-            if not line or '>' in line:
-                break
-            if line.strip():  # Only add non-empty lines
-                response_lines.append(line)
+      response_lines = self._process_users_command(clean_lines)
     else:
-        # Default processing for other commands
-        capture_started = False
-        for line in clean_lines:
-            if not capture_started and command.strip() in line:
-                capture_started = True
-            elif capture_started and '>' in line:
-                break
-            elif capture_started:
-                response_lines.append(line)
+      response_lines = self._process_generic_command(clean_lines, command)
 
     if response_lines:
-        logger.info("Found %d response lines", len(response_lines))
-        return '\n'.join(response_lines)
+      logger.info("Found %d response lines", len(response_lines))
+      return '\n'.join(response_lines)
 
     logger.warning("No response lines found")
     return ""
@@ -363,3 +370,19 @@ class PodmanManager:
     except (ConnectionError, RuntimeError, podman_errors.ContainerNotFound) as e:
       logger.error("Failed to stop container: %s", str(e))
       raise RuntimeError(f"Failed to stop container: {str(e)}") from e
+
+  def get_container_logs(self) -> str:
+    """Get container logs"""
+    try:
+      if not self.is_container_running():
+        return "Container is not running"
+
+      if not self.client:
+        return f"Error: {ERROR_CLIENT_NOT_INITIALIZED}"
+
+      container = self.client.containers.get(self.container_name)
+      logs = container.logs()
+      return logs.decode('utf-8') if isinstance(logs, bytes) else str(logs)
+    except (ConnectionError, RuntimeError, podman_errors.ContainerNotFound) as e:
+      logger.error("Error getting container logs: %s", str(e))
+      return f"Error getting logs: {str(e)}"

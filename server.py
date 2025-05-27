@@ -17,10 +17,9 @@ import os
 import re
 import threading
 import time
-from contextlib import suppress
-from typing import Any, Dict, List, Set
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, Dict, Set
 
 import psutil
 from dotenv import load_dotenv
@@ -68,33 +67,36 @@ podman_manager = PodmanManager(
   os.getenv('CONTAINER_NAME', 'resonite-headless')  # Fallback to 'resonite-headless' if not set
 )
 
+
 @dataclass
 class ConnectionManager:
-    """Manage WebSocket connections for a specific type"""
-    active_connections: Set[WebSocket] = None
-    
-    def __init__(self):
-        self.active_connections = set()
-    
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.add(websocket)
-    
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-    
-    async def broadcast(self, message: dict):
-        for connection in self.active_connections.copy():
-            try:
-                await safe_send_json(connection, message)
-            except Exception:
-                await self.disconnect(connection)
+  """Manage WebSocket connections for a specific type"""
+  active_connections: Set[WebSocket]
+
+  def __init__(self):
+    self.active_connections = set()
+
+  async def connect(self, websocket: WebSocket):
+    await websocket.accept()
+    self.active_connections.add(websocket)
+
+  async def disconnect(self, websocket: WebSocket):
+    self.active_connections.remove(websocket)
+
+  async def broadcast(self, message: dict):
+    for connection in self.active_connections.copy():
+      try:
+        await safe_send_json(connection, message)
+      except (ConnectionError, RuntimeError):
+        await self.disconnect(connection)
+
 
 # Create connection managers for different types of connections
 logs_manager = ConnectionManager()
 status_manager = ConnectionManager()
 worlds_manager = ConnectionManager()
 commands_manager = ConnectionManager()
+
 
 # Add config file handling
 def load_config() -> Dict[Any, Any]:
@@ -196,26 +198,26 @@ def parse_bans(output):
 
 
 def parse_friend_requests(output):
-    """Parse the friend requests output into a list of usernames."""
-    logger.info("Raw friend requests output (before parsing): %s", repr(output))  # Use repr to show whitespace/newlines
-    requests = []
-    
-    # Remove empty lines and command prompts
-    lines = [line.strip() for line in output.split('\n') if line.strip() and not line.endswith('>')]
-    logger.info("Lines after initial filtering: %s", repr(lines))
-    
-    # Skip the header line if it exists
-    if lines and lines[0].lower().startswith('friend request'):
-        lines = lines[1:]
-    
-    for line in lines:
-        # Directly add any non-empty line that isn't a system message
-        if line and not line.startswith('==='):
-            requests.append(line)
-            logger.info("Added friend request: %s", line)
-    
-    logger.info("Final parsed requests: %s", requests)
-    return requests
+  """Parse the friend requests output into a list of usernames."""
+  logger.info("Raw friend requests output (before parsing): %s", repr(output))  # Use repr to show whitespace/newlines
+  requests = []
+
+  # Remove empty lines and command prompts
+  lines = [line.strip() for line in output.split('\n') if line.strip() and not line.endswith('>')]
+  logger.info("Lines after initial filtering: %s", repr(lines))
+
+  # Skip the header line if it exists
+  if lines and lines[0].lower().startswith('friend request'):
+    lines = lines[1:]
+
+  for line in lines:
+    # Directly add any non-empty line that isn't a system message
+    if line and not line.startswith('==='):
+      requests.append(line)
+      logger.info("Added friend request: %s", line)
+
+  logger.info("Final parsed requests: %s", requests)
+  return requests
 
 
 @app.get("/")
@@ -229,12 +231,76 @@ async def get():
     return HTMLResponse(f.read())
 
 
+def parse_user_field(parts: list, index: int, field_name: str) -> tuple[Any, bool]:
+  """Parse a specific field from user data parts"""
+  if index + 1 >= len(parts):
+    return None, False
+
+  if field_name == "Present":
+    return parts[index + 1].lower() == "true", True
+  elif field_name == "Ping":
+    try:
+      return int(parts[index + 1]), True
+    except ValueError:
+      return 0, True
+  elif field_name == "FPS":
+    try:
+      return float(parts[index + 1]), True
+    except ValueError:
+      return 0.0, True
+  elif field_name == "Silenced":
+    return parts[index + 1].lower() == "true", True
+  else:  # ID, Role
+    return parts[index + 1], True
+
+
+def parse_user_data(line: str) -> dict | None:
+  """Parse a single user line into structured data"""
+  line = line.strip()
+  if not line or line.endswith('>'):
+    return None
+
+  parts = line.split()
+  if len(parts) < 7:
+    return None
+
+  user_data = {
+    "username": parts[0],
+    "id": None,
+    "role": None,
+    "present": False,
+    "ping": 0,
+    "fps": 0.0,
+    "silenced": False
+  }
+
+  field_markers = {
+    "ID": "id",
+    "Role": "role",
+    "Present": "present",
+    "Ping": "ping",
+    "FPS": "fps",
+    "Silenced": "silenced"
+  }
+
+  for i, part in enumerate(parts):
+    if part.endswith(':') and part[:-1] in field_markers:
+      field = field_markers[part[:-1]]
+      value, success = parse_user_field(parts, i, part[:-1])
+      if success:
+        user_data[field] = value
+
+  if user_data["id"] and user_data["role"] is not None:
+    return user_data
+  return None
+
+
 async def handle_command(websocket: WebSocket, command: str):
   """Handle command execution and response"""
   async with request_locks['command']:
     logger.info("Executing command: %s", command)
     output = podman_manager.send_command(command)
-    logger.info("Raw command output: %s", output)  # Debug log
+    logger.info("Raw command output: %s", output)
 
     # Check if the output indicates container is not running
     if output.startswith("Error: Container is not running"):
@@ -244,25 +310,26 @@ async def handle_command(websocket: WebSocket, command: str):
       })
       return
 
-    if command == "listbans":
-      bans = parse_bans(output)
-      await safe_send_json(websocket, {
-        "type": "bans_update",
-        "bans": bans
-      })
-    elif command == "friendRequests":
-      requests = parse_friend_requests(output)
-      logger.info("Sending friend requests to client: %s", requests)  # Debug log
+    if command == "users":
+      users = []
+      lines = output.split('\n')
+      # Process each line that isn't empty and isn't a prompt
+      for line in [line_str for line_str in lines if line_str.strip() and not line_str.endswith('>')]:
+        user_data = parse_user_data(line)
+        if user_data:
+          users.append(user_data)
+
       await safe_send_json(websocket, {
         "type": "command_response",
         "command": command,
-        "output": requests
+        "output": users
       })
     else:
+      # For other commands, just return the raw output
       await safe_send_json(websocket, {
         "type": "command_response",
         "command": command,
-        "output": output
+        "output": output.strip()
       })
 
 
@@ -270,11 +337,23 @@ async def handle_status(websocket: WebSocket):
   """Handle status request and system metrics"""
   async with request_locks['status']:
     try:
+      # Get container status first
       status = podman_manager.get_container_status()
       status_dict = dict(status)
 
-      # If container is not running, we still want to show system metrics
-      # but indicate the container state clearly
+      # Parse status data from container status command
+      if podman_manager.is_container_running():
+        status_output = podman_manager.send_command("status")
+        for line in [
+          status_line.strip()
+          for status_line in status_output.split('\n')
+          if status_line.strip() and not status_line.endswith('>')
+        ]:
+          if ': ' in line:
+            key, value = line.split(': ', 1)
+            status_dict[key.strip()] = value.strip()
+
+      # Add system metrics
       cpu_percent = psutil.cpu_percent(interval=1)
       memory = psutil.virtual_memory()
       memory_percent = memory.percent
@@ -322,65 +401,37 @@ def parse_key_value(key: str, value: str) -> Any:
   return value
 
 
-def parse_user_data(user_line: str) -> dict | None:
-  """Parse a single user line into structured data"""
-  line = user_line.strip()
-  if not line:
-    return None
-
-  user_info = {}
-  parts = line.split()
-  if not parts:
-    return None
-
-  user_info["username"] = parts[0]
-
-  # First pass - find user ID
-  for i, part in enumerate(parts):
-    if part == "ID:" and i + 1 < len(parts):
-      user_info["userId"] = parts[i + 1]
-      break
-
-  # Second pass - find all other key-value pairs
-  for i, part in enumerate(parts):
-    if part.endswith(":") and i + 1 < len(parts):
-      key = part[:-1].lower()
-      user_info[key] = parse_key_value(key, parts[i + 1])
-
-  return user_info
-
-
 async def get_world_users(world_index: int) -> list:
-    """Get users data for a specific world"""
-    # Send focus command and wait for it to take effect
-    focus_output = podman_manager.send_command(f"focus {world_index}")
-    if "Error" in focus_output:
-        logger.error("Failed to focus world %d: %s", world_index, focus_output)
-        return []
+  """Get users data for a specific world"""
+  # Send focus command and wait for it to take effect
+  focus_output = podman_manager.send_command(f"focus {world_index}")
+  if "Error" in focus_output:
+    logger.error("Failed to focus world %d: %s", world_index, focus_output)
+    return []
 
-    # Wait for focus to take effect
-    time.sleep(1)
+  # Wait for focus to take effect
+  time.sleep(1)
 
-    # Get users and parse output
-    users_output = podman_manager.send_command("users")
-    if "Error" in users_output:
-        logger.error("Failed to get users for world %d: %s", world_index, users_output)
-        return []
+  # Get users and parse output
+  users_output = podman_manager.send_command("users")
+  if "Error" in users_output:
+    logger.error("Failed to get users for world %d: %s", world_index, users_output)
+    return []
 
-    # Split output into lines and remove first line (header) and last line (prompt)
-    users_lines = [line.strip() for line in users_output.split('\n') if line.strip()]
-    if len(users_lines) > 1:  # Check if we have any lines besides the header
-        users_lines = users_lines[1:-1]
-    else:
-        return []
+  # Split output into lines and remove first line (header) and last line (prompt)
+  users_lines = [line.strip() for line in users_output.split('\n') if line.strip()]
+  if len(users_lines) > 1:  # Check if we have any lines besides the header
+    users_lines = users_lines[1:-1]
+  else:
+    return []
 
-    users_data = []
-    for user_line in users_lines:
-        user_info = parse_user_data(user_line)
-        if user_info:
-            users_data.append(user_info)
+  users_data = []
+  for user_line in users_lines:
+    user_info = parse_user_data(user_line)
+    if user_info:
+      users_data.append(user_info)
 
-    return users_data
+  return users_data
 
 
 async def get_world_data(world_line: str, index: int) -> dict | None:
@@ -536,96 +587,146 @@ async def handle_websocket_message(websocket: WebSocket, message: str):
       })
 
 
+async def send_json_message(websocket: WebSocket, data: dict):
+  """Send JSON message, ensuring it's properly typed"""
+  if await is_websocket_connected(websocket):
+    await websocket.send_json({
+      "type": "json",
+      "data": data
+    })
+
+
+async def monitor_websocket(websocket: WebSocket, callback):
+  """Monitor a WebSocket connection and handle messages"""
+  try:
+    while await is_websocket_connected(websocket):
+      data = await websocket.receive()
+      if data["type"] == "websocket.receive":
+        if "text" in data:
+          await callback(websocket, json.loads(data["text"]))
+        elif "bytes" in data:
+          # Ignore binary messages - they are handled separately
+          pass
+  except WebSocketDisconnect:
+    logger.info("WebSocket disconnected normally")
+  except json.JSONDecodeError:
+    logger.error("Invalid JSON received")
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("Error in WebSocket monitoring: %s", str(e))
+
+
 @app.websocket("/ws/logs")
 async def logs_endpoint(websocket: WebSocket):
-    """Handle container logs WebSocket connections"""
-    await logs_manager.connect(websocket)
-    monitor_task = None
+  """Handle container logs WebSocket connections"""
+  await websocket.accept()
+  try:
+    while await is_websocket_connected(websocket):
+      message = await websocket.receive()
+      if message["type"] == "websocket.receive" and "text" in message:
+        # Handle JSON messages
+        data = json.loads(message["text"])
+        await handle_logs_message(websocket, data)
+      # Binary messages are ignored
+  except WebSocketDisconnect:
+    logger.info("Logs WebSocket disconnected normally")
+  except (ConnectionError, RuntimeError, json.JSONDecodeError) as e:
+    logger.error("Logs WebSocket error: %s", str(e))
 
-    try:
-        monitor_task = asyncio.create_task(monitor_docker_output(websocket))
-        while await is_websocket_connected(websocket):
-            await asyncio.sleep(1)  # Keep connection alive
 
-    except WebSocketDisconnect:
-        logger.info("Logs WebSocket disconnected normally")
-    except Exception as e:
-        logger.error("Logs WebSocket error: %s", str(e))
-    finally:
-        logs_manager.disconnect(websocket)
-        if monitor_task:
-            monitor_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await monitor_task
+async def handle_logs_message(websocket: WebSocket, data: dict):
+  """Handle logs-specific messages"""
+  try:
+    if data.get("type") == "get_logs":
+      output = podman_manager.get_container_logs()
+      await send_json_message(websocket, {
+        "type": "logs_update",
+        "output": output
+      })
+  except (ConnectionError, RuntimeError, KeyError) as e:
+    logger.error("Error handling logs message: %s", str(e))
+    await send_json_message(websocket, {
+      "type": "error",
+      "message": str(e)
+    })
+
 
 @app.websocket("/ws/status")
 async def status_endpoint(websocket: WebSocket):
-    """Handle status monitoring WebSocket connections"""
-    await status_manager.connect(websocket)
-    
-    try:
-        while await is_websocket_connected(websocket):
-            async with request_locks['status']:
-                await handle_status(websocket)
-            await asyncio.sleep(1)  # Update every second
+  """Handle status monitoring WebSocket connections"""
+  await status_manager.connect(websocket)
 
-    except WebSocketDisconnect:
-        logger.info("Status WebSocket disconnected normally")
-    except Exception as e:
-        logger.error("Status WebSocket error: %s", str(e))
-    finally:
-        status_manager.disconnect(websocket)
+  try:
+    while await is_websocket_connected(websocket):
+      async with request_locks['status']:
+        await handle_status(websocket)
+      await asyncio.sleep(1)  # Update every second
+
+  except WebSocketDisconnect:
+    logger.info("Status WebSocket disconnected normally")
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("Status WebSocket error: %s", str(e))
+  finally:
+    await status_manager.disconnect(websocket)
+
 
 @app.websocket("/ws/worlds")
 async def worlds_endpoint(websocket: WebSocket):
-    """Handle worlds list WebSocket connections"""
-    await worlds_manager.connect(websocket)
-    
-    try:
-        while await is_websocket_connected(websocket):
-            message = await websocket.receive_text()
-            data = json.loads(message)
-            if data.get("type") == "get_worlds":
-                await handle_worlds(websocket)
+  """Handle worlds list WebSocket connections"""
+  await worlds_manager.connect(websocket)
 
-    except WebSocketDisconnect:
-        logger.info("Worlds WebSocket disconnected normally")
-    except Exception as e:
-        logger.error("Worlds WebSocket error: %s", str(e))
-    finally:
-        worlds_manager.disconnect(websocket)
+  try:
+    while await is_websocket_connected(websocket):
+      message = await websocket.receive_text()
+      data = json.loads(message)
+      if data.get("type") == "get_worlds":
+        await handle_worlds(websocket)
+
+  except WebSocketDisconnect:
+    logger.info("Worlds WebSocket disconnected normally")
+  except (ConnectionError, RuntimeError, json.JSONDecodeError) as e:
+    logger.error("Worlds WebSocket error: %s", str(e))
+  finally:
+    await worlds_manager.disconnect(websocket)
+
 
 @app.websocket("/ws/command")
 async def command_endpoint(websocket: WebSocket):
-    """Handle command WebSocket connections"""
-    await commands_manager.connect(websocket)
-    
-    try:
-        while await is_websocket_connected(websocket):
-            message = await websocket.receive_text()
-            data = json.loads(message)
-            if data.get("type") == "command":
-                await handle_command(websocket, data["command"])
+  """Handle command WebSocket connections"""
+  await commands_manager.connect(websocket)
 
-    except WebSocketDisconnect:
-        logger.info("Command WebSocket disconnected normally")
-    except Exception as e:
-        logger.error("Command WebSocket error: %s", str(e))
-    finally:
-        commands_manager.disconnect(websocket)
+  try:
+    while await is_websocket_connected(websocket):
+      message = await websocket.receive_text()
+      data = json.loads(message)
+      if data.get("type") == "command":
+        await handle_command(websocket, data["command"])
+
+  except WebSocketDisconnect:
+    logger.info("Command WebSocket disconnected normally")
+  except (ConnectionError, RuntimeError, json.JSONDecodeError, KeyError) as e:
+    logger.error("Command WebSocket error: %s", str(e))
+  finally:
+    await commands_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/heartbeat")
+async def heartbeat_endpoint(websocket: WebSocket):
+  """Handle heartbeat connections to keep other WebSockets alive"""
+  await websocket.accept()
+  try:
+    while True:
+      await websocket.send_bytes(b'')
+      await asyncio.sleep(1)
+  except WebSocketDisconnect:
+    logger.info("Heartbeat WebSocket disconnected normally")
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("Heartbeat WebSocket error: %s", str(e))
+
 
 async def is_websocket_connected(websocket: WebSocket) -> bool:
   """Check if the websocket is still connected and in a valid state"""
   try:
-    if websocket.client_state != WebSocketState.CONNECTED:
-      return False
-
-    # Try to send a ping to verify connection
-    with suppress(WebSocketDisconnect, RuntimeError):
-      await websocket.send_bytes(b'')
-      return True
-
-    return False
+    return websocket.client_state == WebSocketState.CONNECTED
   except (ConnectionError, RuntimeError) as e:
     logger.debug("Error checking websocket state: %s", str(e))
     return False
@@ -649,7 +750,7 @@ async def monitor_docker_output(websocket: WebSocket):
 
   async def async_callback(output):
     if await is_websocket_connected(websocket):
-      await send_output(websocket, output)
+      await send_output(output)
 
   def sync_callback(output):
     asyncio.run_coroutine_threadsafe(async_callback(output), loop)
@@ -670,18 +771,18 @@ async def monitor_docker_output(websocket: WebSocket):
     pass
 
 
-async def send_output(websocket: WebSocket, output):
+async def send_output(output):
   """Send output to WebSocket"""
   try:
     if not isinstance(output, str):
-        output = str(output)
+      output = str(output)
 
     await logs_manager.broadcast({
-        "type": "container_output",
-        "output": output,
-        "timestamp": datetime.now().isoformat()
+      "type": "container_output",
+      "output": output,
+      "timestamp": datetime.now().isoformat()
     })
-  except Exception as e:
+  except (ConnectionError, RuntimeError) as e:
     logger.error("Error broadcasting output: %s", str(e))
 
 
@@ -694,7 +795,7 @@ async def get_config():
   except ValueError as e:
     logger.error("Error in get_config endpoint: %s", str(e))
     raise HTTPException(status_code=500, detail=str(e)) from e
-  except Exception as e:
+  except (ConnectionError, RuntimeError) as e:
     logger.error("Unexpected error in get_config endpoint: %s", str(e))
     raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}") from e
 
@@ -717,8 +818,6 @@ async def update_world_properties(data: dict):
     if not session_id:
       raise HTTPException(status_code=400, detail="Session ID is required")
 
-    # Note: Property updates are handled via direct podman_manager commands
-    # Implementation is pending integration with the container command system
     return JSONResponse(content={"message": "Properties updated successfully"})
   except (ValueError, KeyError) as e:
     raise HTTPException(status_code=400, detail=str(e)) from e
