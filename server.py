@@ -114,6 +114,9 @@ logs_manager = ConnectionManager()
 status_manager = ConnectionManager()
 worlds_manager = ConnectionManager()
 commands_manager = ConnectionManager()
+cpu_manager = ConnectionManager()
+memory_manager = ConnectionManager()
+container_status_manager = ConnectionManager()
 
 
 # Add config file handling
@@ -313,6 +316,42 @@ def parse_user_data(line: str) -> dict | None:
   return None
 
 
+async def handle_specific_command(websocket: WebSocket, command: str, output: str):
+  """Handle specific command types with structured responses"""
+  if command == "listbans":
+    bans = parse_bans(output) if output.strip() else []
+    await safe_send_json(websocket, {
+      "type": "bans_update",
+      "bans": bans
+    })
+    return True
+
+  if command == "friendRequests":
+    requests = parse_friend_requests(output) if output.strip() else []
+    await safe_send_json(websocket, {
+      "type": "command_response",
+      "command": command,
+      "output": requests
+    })
+    return True
+
+  if command == "users":
+    users = [
+      user_data
+      for line in output.split('\n')
+      if line.strip() and not line.endswith('>')
+      if (user_data := parse_user_data(line))
+    ]
+    await safe_send_json(websocket, {
+      "type": "command_response",
+      "command": command,
+      "output": users
+    })
+    return True
+
+  return False
+
+
 async def handle_command(websocket: WebSocket, command: str):
   """Handle command execution and response"""
   async with request_locks['command']:
@@ -320,7 +359,6 @@ async def handle_command(websocket: WebSocket, command: str):
     output = podman_manager.send_command(command)
     logger.info("Raw command output: %s", output)
 
-    # Check if the output indicates container is not running
     if output.startswith("Error: Container is not running"):
       await safe_send_json(websocket, {
         "type": "error",
@@ -328,36 +366,9 @@ async def handle_command(websocket: WebSocket, command: str):
       })
       return
 
-    # Handle specific command types
-    if command == "listbans":
-      bans = parse_bans(output) if output.strip() else []
-      await safe_send_json(websocket, {
-        "type": "bans_update",
-        "bans": bans
-      })
-    elif command == "friendRequests":
-      requests = parse_friend_requests(output) if output.strip() else []
-      await safe_send_json(websocket, {
-          "type": "command_response",
-          "command": command,
-          "output": requests
-      })
-    elif command == "users":
-      users = []
-      lines = output.split('\n')
-      # Process each line that isn't empty and isn't a prompt
-      for line in [line_str for line_str in lines if line_str.strip() and not line_str.endswith('>')]:
-        user_data = parse_user_data(line)
-        if user_data:
-          users.append(user_data)
-
-      await safe_send_json(websocket, {
-        "type": "command_response",
-        "command": command,
-        "output": users
-      })
-    else:
-      # For other commands, just return the raw output
+    # Try to handle as a specific command type
+    if not await handle_specific_command(websocket, command, output):
+      # If not a specific command, return raw output
       await safe_send_json(websocket, {
         "type": "command_response",
         "command": command,
@@ -368,18 +379,9 @@ async def handle_command(websocket: WebSocket, command: str):
 async def handle_status(websocket: WebSocket):
   """Handle status request and system metrics"""
   try:
-    # Get container status first
     status = podman_manager.get_container_status()
     status_dict = dict(status)
 
-    # Add system metrics
-    cpu_percent = psutil.cpu_percent(interval=None)  # Changed to not block
-    memory = psutil.virtual_memory()
-    memory_percent = memory.percent
-    memory_used = f"{memory.used / (1024 * 1024 * 1024):.1f}GB"
-    memory_total = f"{memory.total / (1024 * 1024 * 1024):.1f}GB"
-
-    # Parse status data from container status command if container is running
     if podman_manager.is_container_running():
       status_output = podman_manager.send_command("status")
       for line in [
@@ -391,21 +393,13 @@ async def handle_status(websocket: WebSocket):
           key, value = line.split(': ', 1)
           status_dict[key.strip()] = value.strip()
 
-    full_status = {
-      **status_dict,
-      "cpu_usage": cpu_percent,
-      "memory_percent": memory_percent,
-      "memory_used": memory_used,
-      "memory_total": memory_total
-    }
-
     if status_dict.get('error'):
-      full_status['status'] = 'stopped'
-      full_status['error_message'] = status_dict['error']
+      status_dict['status'] = 'stopped'
+      status_dict['error_message'] = status_dict['error']
 
     await safe_send_json(websocket, {
       "type": "status_update",
-      "status": full_status
+      "status": status_dict
     })
   except (ConnectionError, RuntimeError) as e:
     logger.error("Error in handle_status: %s", str(e))
@@ -648,75 +642,68 @@ async def monitor_websocket(websocket: WebSocket, callback):
 
 @app.websocket("/ws/logs")
 async def logs_endpoint(websocket: WebSocket):
-    """Handle container logs WebSocket connections"""
-    await logs_manager.connect(websocket)
+  """Handle container logs WebSocket connections"""
+  await logs_manager.connect(websocket)
 
-    try:
-        # Send initial recent logs
-        recent_logs = podman_manager.get_recent_logs()
-        for log_line in recent_logs:
-            await safe_send_json(websocket, {
-                "type": "container_output",
-                "output": log_line,
-                "timestamp": datetime.now().isoformat()
-            })
+  try:
+    recent_logs = podman_manager.get_recent_logs()
+    for log_line in recent_logs:
+      await safe_send_json(websocket, {
+        "type": "container_output",
+        "output": log_line,
+        "timestamp": datetime.now().isoformat()
+      })
 
-        # Set up streaming
-        async def stream_callback(output):
-            if await is_websocket_connected(websocket):
-                await safe_send_json(websocket, {
-                    "type": "container_output",
-                    "output": output,
-                    "timestamp": datetime.now().isoformat()
-                })
+    async def stream_callback(output):
+      if await is_websocket_connected(websocket):
+        await safe_send_json(websocket, {
+          "type": "container_output",
+          "output": output,
+          "timestamp": datetime.now().isoformat()
+        })
 
-        # Start monitoring in a separate thread
-        loop = asyncio.get_running_loop()
-        def sync_callback(output):
-            asyncio.run_coroutine_threadsafe(stream_callback(output), loop)
+    loop = asyncio.get_running_loop()
 
-        thread = threading.Thread(
-            target=podman_manager.monitor_output,
-            args=(sync_callback,),
-            daemon=True
-        )
-        thread.start()
+    def sync_callback(output):
+      asyncio.run_coroutine_threadsafe(stream_callback(output), loop)
 
-        # Keep the connection alive
-        while await is_websocket_connected(websocket):
-            try:
-                message = await websocket.receive()
-                # Handle any incoming messages if needed
-            except WebSocketDisconnect:
-                break
+    thread = threading.Thread(
+      target=podman_manager.monitor_output,
+      args=(sync_callback,),
+      daemon=True
+    )
+    thread.start()
 
-    except WebSocketDisconnect:
-        logger.info("Logs WebSocket disconnected normally")
-    except (ConnectionError, RuntimeError) as e:
-        logger.error("Logs WebSocket error: %s", str(e))
-    finally:
-        await logs_manager.disconnect(websocket)
+    while await is_websocket_connected(websocket):
+      await asyncio.sleep(1)  # Keep the connection alive
+
+  except WebSocketDisconnect:
+    logger.info("Logs WebSocket disconnected normally")
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("Logs WebSocket error: %s", str(e))
+  finally:
+    await logs_manager.disconnect(websocket)
 
 
 @app.websocket("/ws/status")
 async def status_endpoint(websocket: WebSocket):
-    """Handle status monitoring WebSocket connections"""
-    await status_manager.connect(websocket)
+  """Handle status monitoring WebSocket connections"""
+  await status_manager.connect(websocket)
 
-    try:
-        while await is_websocket_connected(websocket):
-            message = await websocket.receive_text()
-            data = json.loads(message)
-            if data.get("type") == "get_status":
-                async with request_locks['status']:
-                    await handle_status(websocket)
+  try:
+    while await is_websocket_connected(websocket):
+      message = await websocket.receive_text()
+      data = json.loads(message)
+      if data.get("type") == "get_status":
+        async with request_locks['status']:
+          await handle_status(websocket)
 
-    except WebSocketDisconnect:
-        logger.info("Status WebSocket disconnected normally")
-    except (ConnectionError, RuntimeError, json.JSONDecodeError) as e:
-        logger.error("Status WebSocket error: %s", str(e))
-    finally:
-        await status_manager.disconnect(websocket)
+  except WebSocketDisconnect:
+    logger.info("Status WebSocket disconnected normally")
+  except (ConnectionError, RuntimeError, json.JSONDecodeError) as e:
+    logger.error("Status WebSocket error: %s", str(e))
+  finally:
+    await status_manager.disconnect(websocket)
 
 
 @app.websocket("/ws/worlds")
@@ -771,6 +758,80 @@ async def heartbeat_endpoint(websocket: WebSocket):
     logger.info("Heartbeat WebSocket disconnected normally")
   except (ConnectionError, RuntimeError) as e:
     logger.error("Heartbeat WebSocket error: %s", str(e))
+
+
+@app.websocket("/ws/cpu")
+async def cpu_endpoint(websocket: WebSocket):
+  """Handle CPU monitoring WebSocket connections"""
+  await cpu_manager.connect(websocket)
+
+  try:
+    while await is_websocket_connected(websocket):
+      cpu_percent = psutil.cpu_percent(interval=None)
+      await safe_send_json(websocket, {
+        "type": "cpu_update",
+        "cpu_usage": cpu_percent
+      })
+      await asyncio.sleep(1)  # Update every second
+
+  except WebSocketDisconnect:
+    logger.info("CPU WebSocket disconnected normally")
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("CPU WebSocket error: %s", str(e))
+  finally:
+    await cpu_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/memory")
+async def memory_endpoint(websocket: WebSocket):
+  """Handle memory monitoring WebSocket connections"""
+  await memory_manager.connect(websocket)
+
+  try:
+    while await is_websocket_connected(websocket):
+      memory = psutil.virtual_memory()
+      memory_percent = memory.percent
+      memory_used = f"{memory.used / (1024 * 1024 * 1024):.1f}GB"
+      memory_total = f"{memory.total / (1024 * 1024 * 1024):.1f}GB"
+
+      await safe_send_json(websocket, {
+        "type": "memory_update",
+        "memory_percent": memory_percent,
+        "memory_used": memory_used,
+        "memory_total": memory_total
+      })
+      await asyncio.sleep(1)  # Update every second
+
+  except WebSocketDisconnect:
+    logger.info("Memory WebSocket disconnected normally")
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("Memory WebSocket error: %s", str(e))
+  finally:
+    await memory_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/container_status")
+async def container_status_endpoint(websocket: WebSocket):
+  """Handle container status WebSocket connections"""
+  await container_status_manager.connect(websocket)
+
+  try:
+    while await is_websocket_connected(websocket):
+      message = await websocket.receive_text()
+      data = json.loads(message)
+      if data.get("type") == "get_container_status":
+        status = podman_manager.get_container_status()
+        await safe_send_json(websocket, {
+          "type": "container_status_update",
+          "status": status
+        })
+
+  except WebSocketDisconnect:
+    logger.info("Container Status WebSocket disconnected normally")
+  except (ConnectionError, RuntimeError, json.JSONDecodeError) as e:
+    logger.error("Container Status WebSocket error: %s", str(e))
+  finally:
+    await container_status_manager.disconnect(websocket)
 
 
 async def is_websocket_connected(websocket: WebSocket) -> bool:

@@ -2,6 +2,9 @@ let wsLogs;
 let wsStatus;
 let wsWorlds;
 let wsCommand;
+let wsCpu;
+let wsMemory;
+let wsContainerStatus;
 const output = document.getElementById('output');
 const commandInput = document.getElementById('command-input');
 const statusDiv = document.getElementById('status');
@@ -65,22 +68,6 @@ function connect() {
   };
   wsLogs.onclose = () => setTimeout(() => connect(), 1000);
 
-  // Connect to status endpoint
-  wsStatus = new WebSocket(`${wsProtocol}//${wsHost}:8000/ws/status`);
-  wsStatus.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    if (data.type === 'status_update') {
-      updateStatus(data.status);
-    } else if (data.type === 'error') {
-      showError(data.message);
-    }
-  };
-  wsStatus.onclose = () => setTimeout(() => connect(), 1000);
-  wsStatus.onopen = function() {
-    // Start periodic status updates when connected
-    updateStatusInterval();
-  };
-
   // Connect to worlds endpoint
   wsWorlds = new WebSocket(`${wsProtocol}//${wsHost}:8000/ws/worlds`);
   wsWorlds.onmessage = function(event) {
@@ -110,6 +97,42 @@ function connect() {
   };
   wsCommand.onclose = () => setTimeout(() => connect(), 1000);
 
+  // Connect to CPU endpoint
+  wsCpu = new WebSocket(`${wsProtocol}//${wsHost}:8000/ws/cpu`);
+  wsCpu.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    if (data.type === 'cpu_update') {
+      updateCpuUsage(data.cpu_usage);
+    }
+  };
+  wsCpu.onclose = () => setTimeout(() => connect(), 1000);
+
+  // Connect to memory endpoint
+  wsMemory = new WebSocket(`${wsProtocol}//${wsHost}:8000/ws/memory`);
+  wsMemory.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    if (data.type === 'memory_update') {
+      updateMemoryUsage(data.memory_percent, data.memory_used, data.memory_total);
+    }
+  };
+  wsMemory.onclose = () => setTimeout(() => connect(), 1000);
+
+  // Connect to container status endpoint
+  wsStatus = new WebSocket(`${wsProtocol}//${wsHost}:8000/ws/container_status`);
+  wsStatus.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    if (data.type === 'container_status_update') {
+      updateContainerStatus(data.status);
+    } else if (data.type === 'error') {
+      showError(data.message);
+    }
+  };
+  wsStatus.onclose = () => setTimeout(() => connect(), 1000);
+  wsStatus.onopen = requestContainerStatus;
+
+  // Set up periodic container status checks
+  setInterval(requestContainerStatus, 5000); // Check every 5 seconds
+
   // Set up periodic status updates
   setInterval(() => {
     if (wsWorlds && wsWorlds.readyState === WebSocket.OPEN) {
@@ -138,25 +161,55 @@ function connect() {
   }, bannedUsersInterval);
 }
 
-// Add this function to handle status interval updates
-function updateStatusInterval() {
-  // Clear existing timer if any
-  if (statusTimer) {
-    clearInterval(statusTimer);
+function updateCpuUsage(cpuUsage) {
+  const cpuUsageElement = document.getElementById('cpu-usage');
+  if (cpuUsageElement) {
+    cpuUsageElement.textContent = `${cpuUsage.toFixed(1)}%`;
+  }
+}
+
+function updateMemoryUsage(memoryPercent, memoryUsed, memoryTotal) {
+  const memoryUsageElement = document.getElementById('memory-usage');
+  if (memoryUsageElement) {
+    memoryUsageElement.textContent = `${memoryPercent.toFixed(1)}% (${memoryUsed}/${memoryTotal})`;
+  }
+}
+
+function updateContainerStatus(status) {
+  const statusDiv = document.getElementById('status');
+  const statusText = statusDiv.querySelector('.status-text');
+
+  // Remove all existing status classes
+  statusDiv.classList.remove('status-connecting', 'status-running', 'status-stopped');
+
+  if (status.error) {
+    statusDiv.classList.add('status-stopped');
+    statusText.textContent = `Error - ${status.error}`;
+    updateContainerControls('stopped');
+    return;
   }
 
-  // Function to request status update
-  function requestStatus() {
-    if (wsStatus && wsStatus.readyState === WebSocket.OPEN) {
-      wsStatus.send(JSON.stringify({ type: 'get_status' }));
-    }
+  switch (status.status.toLowerCase()) {
+    case 'running':
+      statusDiv.classList.add('status-running');
+      updateContainerControls('running');
+      break;
+    case 'stopped':
+    case 'exited':
+      statusDiv.classList.add('status-stopped');
+      updateContainerControls('stopped');
+      break;
+    default:
+      statusDiv.classList.add('status-connecting');
   }
 
-  // Request initial status
-  requestStatus();
+  statusText.textContent = `${status.status} (${status.name})`;
+}
 
-  // Set up new timer
-  statusTimer = setInterval(requestStatus, statusInterval);
+function requestContainerStatus() {
+  if (wsStatus && wsStatus.readyState === WebSocket.OPEN) {
+    wsStatus.send(JSON.stringify({ type: 'get_container_status' }));
+  }
 }
 
 function sendCommand() {
@@ -286,53 +339,3 @@ function updateContainerControls(status) {
     restartBtn.disabled = true;
   }
 }
-
-function updateStatus(status) {
-  const statusDiv = document.getElementById('status');
-  const statusText = statusDiv.querySelector('.status-text');
-  const lastUpdated = statusDiv.querySelector('.last-updated');
-  const cpuUsage = document.getElementById('cpu-usage');
-  const memoryUsage = document.getElementById('memory-usage');
-
-  // Update last-updated timestamp
-  const now = new Date();
-  const timeString = now.toLocaleTimeString();
-  lastUpdated.textContent = `Last updated: ${timeString}`;
-
-  // Remove all existing status classes
-  statusDiv.classList.remove('status-connecting', 'status-running', 'status-stopped');
-
-  if (status.error) {
-    statusDiv.classList.add('status-stopped');
-    statusText.textContent = `Error - ${status.error}`;
-    updateContainerControls('stopped');
-    return;
-  }
-
-  // Update system stats
-  if (status.cpu_usage !== undefined) {
-    cpuUsage.textContent = `${status.cpu_usage.toFixed(1)}%`;
-  }
-
-  if (status.memory_percent !== undefined) {
-    memoryUsage.textContent = `${status.memory_percent.toFixed(1)}% (${status.memory_used}/${status.memory_total})`;
-  }
-
-  switch (status.status.toLowerCase()) {
-    case 'running':
-      statusDiv.classList.add('status-running');
-      updateContainerControls('running');
-      break;
-    case 'stopped':
-    case 'exited':
-      statusDiv.classList.add('status-stopped');
-      updateContainerControls('stopped');
-      break;
-    default:
-      statusDiv.classList.add('status-connecting');
-  }
-
-  statusText.textContent = `${status.status} (${status.name})`;
-}
-
-// Rest of the code remains unchanged
