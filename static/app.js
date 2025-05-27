@@ -957,8 +957,13 @@ function updateFriendRequests(requests) {
   const requestsList = document.getElementById('friend-requests-list');
   const header = document.querySelector('.friend-requests-card .sidebar-header');
 
-  // Filter out previously denied requests
-  const filteredRequests = requests.filter(username => !deniedFriendRequests.has(username));
+  // Convert requests to array if it's a string
+  const requestsArray = Array.isArray(requests) ? requests : [requests];
+  
+  // Filter out empty strings and previously denied requests
+  const filteredRequests = requestsArray.filter(username => 
+    username && username.trim() && !deniedFriendRequests.has(username.trim())
+  );
 
   // Update the header with request count
   const existingCount = header.querySelector('.request-count');
@@ -981,10 +986,10 @@ function updateFriendRequests(requests) {
   requestsList.innerHTML = filteredRequests
     .map(username => `
       <div class="friend-request">
-        <div class="username">${username}</div>
+        <div class="username">${username.trim()}</div>
         <div class="request-actions">
-          <button onclick="handleFriendRequest('accept', '${username}')" class="accept-button">Accept</button>
-          <button onclick="handleFriendRequest('deny', '${username}')" class="deny-button">Deny</button>
+          <button onclick="handleFriendRequest('accept', '${username.trim()}')" class="accept-button">Accept</button>
+          <button onclick="handleFriendRequest('deny', '${username.trim()}')" class="deny-button">Deny</button>
         </div>
       </div>
     `)
