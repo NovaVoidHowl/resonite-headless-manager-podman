@@ -781,7 +781,7 @@ function updateLineHighlight() {
   highlight.style.top = `${(currentLineNumber - 1) * lineHeight + 10}px`; // Add padding offset
 }
 
-// Add this function to handle world selection
+// Add function to handle world selection
 function selectWorld(sessionId) {
   const worldsList = document.getElementById('worlds-list');
   const previousSelected = worldsList.querySelector('.world-card.selected');
@@ -793,10 +793,69 @@ function selectWorld(sessionId) {
   if (selectedWorld) {
     selectedWorld.classList.add('selected');
     updateWorldPropertiesEditor(sessionId);
+    updateConnectedUsers(selectedWorld);
   }
 }
 
-// Add this helper function to store the original world data
+// Add this new function to update Connected Users panel
+function updateConnectedUsers(worldCard) {
+  const connectedUsersPanel = document.getElementById('connected-users');
+  const worldName = worldCard.querySelector('.world-name').textContent;
+  const usersList = worldCard.querySelector('.user-list');
+  
+  // Update panel header
+  document.getElementById('connected-users-world-name').textContent = worldName;
+  
+  // Update users list
+  const connectedUsersList = document.getElementById('connected-users-list');
+  if (usersList) {
+    connectedUsersList.innerHTML = usersList.innerHTML;
+    connectedUsersPanel.style.display = 'block';
+  } else {
+    connectedUsersList.innerHTML = '<div class="no-users">No users connected</div>';
+    connectedUsersPanel.style.display = 'block';
+  }
+}
+
+// Add function to copy all usernames
+function copyAllUsernames() {
+  const usersList = document.getElementById('connected-users-list');
+  const usernames = Array.from(usersList.querySelectorAll('.user-name'))
+    .map(nameElement => nameElement.textContent.trim());
+
+  if (usernames.length === 0) {
+    showCopySuccess('No users to copy');
+    return;
+  }
+
+  const text = usernames.join('\n');
+  
+  // Use the Clipboard API if available
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text)
+      .then(() => showCopySuccess('All usernames copied!'))
+      .catch(err => console.error('Failed to copy usernames:', err));
+  } else {
+    // Fallback for browsers that don't support Clipboard API
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+      document.execCommand('copy');
+      showCopySuccess('All usernames copied!');
+    } catch (err) {
+      console.error('Failed to copy usernames:', err);
+    }
+
+    document.body.removeChild(textArea);
+  }
+}
+
+// Add this function to handle world selection
 function updateWorldPropertiesEditor(sessionId) {
   const worldCard = document.querySelector(`.world-card[data-session-id="${sessionId}"]`);
   if (!worldCard) return;
@@ -1309,7 +1368,9 @@ async function handleRoleChange(event, username, worldIndex) {
 // Add this function after the saveWorldProperties function
 function cancelWorldProperties() {
   const propertiesEditor = document.getElementById('world-properties');
+  const connectedUsersPanel = document.getElementById('connected-users');
   propertiesEditor.style.display = 'none';
+  connectedUsersPanel.style.display = 'none';
 
   // Clear the selected state from the world card
   const worldsList = document.getElementById('worlds-list');
@@ -1348,7 +1409,7 @@ function copyText(text, type) {
       showCopySuccess(type);
     })
     .catch(err => {
-      console.error('Failed to copy text: ', err);
+      console.error('Failed to copy text:', err);
     });
 }
 

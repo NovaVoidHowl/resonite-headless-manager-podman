@@ -187,11 +187,19 @@
             <button onclick="cancelWorldProperties()" class="cancel-button">Cancel</button>
           </div>
         </div>
+      </div>
 
-        <!-- Add Connected Users Section -->
-        <div class="setting-group connected-users-section">
-          <div class="sidebar-header">Connected Users</div>
-          <div id="world-properties-users-list"></div>
+      <!-- Connected Users Card -->
+      <div id="connected-users" style="display: none;" class="settings-card">
+        <div class="sidebar-header">Connected Users</div>
+        <div class="connected-users-content">
+          <div class="users-header">
+            <span id="connected-users-world-name"></span>
+            <button onclick="copyAllUsernames()" class="copy-all-button" title="Copy all usernames">
+              Copy All Names
+            </button>
+          </div>
+          <div id="connected-users-list"></div>
         </div>
       </div>
     </div>
