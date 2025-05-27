@@ -1655,3 +1655,23 @@ button:active {
   background-color: #4CAF5044;
 }
 
+/* Add styles for the refresh button */
+.refresh-button {
+  background: none;
+  border: 1px solid #4CAF50;
+  color: #4CAF50;
+  padding: 4px 12px;
+  font-size: 0.9em;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.refresh-button:hover {
+  background-color: #4CAF5022;
+}
+
+.refresh-button:active {
+  background-color: #4CAF5044;
+}
+

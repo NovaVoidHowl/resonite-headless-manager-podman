@@ -817,42 +817,9 @@ function updateConnectedUsers(worldCard) {
   }
 }
 
-// Add function to copy all usernames
-function copyAllUsernames() {
-  const usersList = document.getElementById('connected-users-list');
-  const usernames = Array.from(usersList.querySelectorAll('.user-name'))
-    .map(nameElement => nameElement.textContent.trim());
-
-  if (usernames.length === 0) {
-    showCopySuccess('No users to copy');
-    return;
-  }
-
-  const text = usernames.join('\n');
-  
-  // Use the Clipboard API if available
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text)
-      .then(() => showCopySuccess('All usernames copied!'))
-      .catch(err => console.error('Failed to copy usernames:', err));
-  } else {
-    // Fallback for browsers that don't support Clipboard API
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed';
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-
-    try {
-      document.execCommand('copy');
-      showCopySuccess('All usernames copied!');
-    } catch (err) {
-      console.error('Failed to copy usernames:', err);
-    }
-
-    document.body.removeChild(textArea);
-  }
+// Add function to refresh users list
+function refreshUsersList() {
+  ws.send(JSON.stringify({ type: 'get_worlds' }));
 }
 
 // Add this function to handle world selection
