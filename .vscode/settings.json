@@ -1,6 +1,7 @@
 {
   "cSpell.words": [
     "asyncio",
+    "checkmark",
     "dotenv",
     "fastapi",
     "frontmatter",
@@ -9,6 +10,7 @@
     "psutil",
     "pycache",
     "Resonite",
+    "scrollbars",
     "unban",
     "unsilence",
     "uvicorn",
