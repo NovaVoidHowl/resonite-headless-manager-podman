@@ -169,6 +169,32 @@ def parse_bans(output):
   return bans
 
 
+def parse_friend_requests(output):
+  """Parse the friend requests output into a list of usernames.
+
+  Args:
+    output (str): Raw output from the friendRequests command
+
+  Returns:
+    list: List of usernames who have sent friend requests
+  """
+  requests = []
+  # Split by newlines and skip the first line (header) and last line (prompt)
+  lines = output.split('\n')[1:-1]
+
+  for line in lines:
+    line = line.strip()
+    # Skip empty lines and command prompts
+    if line and not line.endswith('>'):
+      # Extract username from the line
+      if ':' in line:  # If line contains user info
+        username = line.split(':')[1].strip()
+        if username:
+          requests.append(username)
+
+  return requests
+
+
 @app.get("/")
 async def get():
   """Serve the main web interface HTML page.
@@ -199,6 +225,13 @@ async def handle_command(websocket: WebSocket, command: str):
       await safe_send_json(websocket, {
         "type": "bans_update",
         "bans": bans
+      })
+    elif command == "friendRequests":
+      requests = parse_friend_requests(output)
+      await safe_send_json(websocket, {
+        "type": "command_response",
+        "command": command,
+        "output": requests
       })
     else:
       await safe_send_json(websocket, {
