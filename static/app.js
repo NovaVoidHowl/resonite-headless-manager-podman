@@ -552,7 +552,7 @@ function copyToClipboard(sessionId) {
       }, 2000);
     })
     .catch(err => {
-      console.error('Failed to copy text: ', err);
+      console.error('Failed to copy text:', err);
     });
 }
 
@@ -891,17 +891,6 @@ function updateWorldPropertiesEditor(sessionId) {
   // Store session ID and world index for the save function
   propertiesEditor.dataset.sessionId = sessionId;
   propertiesEditor.dataset.worldIndex = worldCard.dataset.index;
-
-  // Update users list in properties panel
-  const usersList = document.getElementById('world-properties-users-list');
-  const worldUsersList = worldCard.querySelector('.user-list');
-  
-  if (worldUsersList) {
-    // Clone the users list from the world card
-    usersList.innerHTML = worldUsersList.innerHTML;
-  } else {
-    usersList.innerHTML = '<div class="no-users">No users connected</div>';
-  }
 }
 
 // Helper function to find world data by session ID
