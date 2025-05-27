@@ -295,10 +295,10 @@ class PodmanManager:
     try:
       if not self.client:
         raise RuntimeError(ERROR_CLIENT_NOT_INITIALIZED)
-        
+
       container = self.client.containers.get(self.container_name)
       container.start()
-      
+
       # Wait for container to be running
       retries = 0
       max_retries = 10
@@ -309,9 +309,9 @@ class PodmanManager:
           return
         time.sleep(1)
         retries += 1
-      
+
       logger.warning("Container start took longer than expected")
-      
+
     except (ConnectionError, RuntimeError, podman_errors.ContainerNotFound) as e:
       logger.error("Failed to start container: %s", str(e))
       raise RuntimeError(f"Failed to start container: {str(e)}") from e
@@ -321,14 +321,14 @@ class PodmanManager:
     try:
       if not self.client:
         raise RuntimeError(ERROR_CLIENT_NOT_INITIALIZED)
-        
+
       container = self.client.containers.get(self.container_name)
-      
+
       # Stop monitoring if it's running
       self._monitor_running = False
-      
+
       container.stop()
-      
+
       # Wait for container to be stopped
       retries = 0
       max_retries = 10
@@ -339,9 +339,9 @@ class PodmanManager:
           return
         time.sleep(1)
         retries += 1
-      
+
       logger.warning("Container stop took longer than expected")
-      
+
     except (ConnectionError, RuntimeError, podman_errors.ContainerNotFound) as e:
       logger.error("Failed to stop container: %s", str(e))
       raise RuntimeError(f"Failed to stop container: {str(e)}") from e
