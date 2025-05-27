@@ -1587,3 +1587,32 @@ button:active {
   display: none;
 }
 
+/* Add styles for the Connected Users section in World Properties */
+.connected-users-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #3a3a3a;
+}
+
+.connected-users-section .sidebar-header {
+  margin-bottom: 15px;
+  font-size: 1.1em;
+}
+
+.no-users {
+  color: #888;
+  text-align: center;
+  padding: 12px;
+  font-style: italic;
+}
+
+#world-properties-users-list .user-list {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+#world-properties-users-list .user-card:first-child {
+  margin-top: 0;
+}
+

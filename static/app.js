@@ -385,10 +385,10 @@ function updateWorlds(worlds) {
                       ${user.present ? 'Present' : 'Away'}
                     </span>
                     <span class="user-stat" title="Ping">
-                      ${user.ping}ms
+                      ${user.ping !== undefined ? `${user.ping}ms` : 'N/A'}
                     </span>
                     <span class="user-stat" title="FPS">
-                      ${user.fps.toFixed(1)} FPS
+                      ${user.fps !== undefined ? `${user.fps.toFixed(1)} FPS` : 'N/A'}
                     </span>
                     ${user.silenced ? '<span class="user-stat silenced" title="User is silenced">🔇</span>' : ''}
                   </div>
@@ -798,14 +798,14 @@ function selectWorld(sessionId) {
 
 // Add this helper function to store the original world data
 function updateWorldPropertiesEditor(sessionId) {
-  const world = findWorldBySessionId(sessionId);
-  if (!world) return;
+  const worldCard = document.querySelector(`.world-card[data-session-id="${sessionId}"]`);
+  if (!worldCard) return;
 
   const propertiesEditor = document.getElementById('world-properties');
   propertiesEditor.style.display = 'block';
 
   // Update world name in the header
-  document.getElementById('selected-world-name').textContent = world.name;
+  document.getElementById('selected-world-name').textContent = worldCard.querySelector('.world-name').textContent;
 
   // Update form values and store original values
   const form = {
@@ -816,22 +816,33 @@ function updateWorldPropertiesEditor(sessionId) {
     maxUsers: document.getElementById('world-max-users')
   };
 
-  form.name.value = world.name;
-  form.hidden.checked = world.hidden;
-  form.description.value = world.description || '';
-  form.accessLevel.value = world.accessLevel;
-  form.maxUsers.value = world.maxUsers;
+  form.name.value = worldCard.dataset.name;
+  form.hidden.checked = worldCard.dataset.hidden === 'true';
+  form.description.value = worldCard.dataset.description || '';
+  form.accessLevel.value = worldCard.dataset.accessLevel;
+  form.maxUsers.value = worldCard.dataset.maxUsers;
 
   // Store original values for comparison
-  propertiesEditor.dataset.originalName = world.name;
-  propertiesEditor.dataset.originalHidden = world.hidden;
-  propertiesEditor.dataset.originalDescription = world.description || '';
-  propertiesEditor.dataset.originalAccessLevel = world.accessLevel;
-  propertiesEditor.dataset.originalMaxUsers = world.maxUsers;
+  propertiesEditor.dataset.originalName = worldCard.dataset.name;
+  propertiesEditor.dataset.originalHidden = worldCard.dataset.hidden;
+  propertiesEditor.dataset.originalDescription = worldCard.dataset.description || '';
+  propertiesEditor.dataset.originalAccessLevel = worldCard.dataset.accessLevel;
+  propertiesEditor.dataset.originalMaxUsers = worldCard.dataset.maxUsers;
 
-  // Store session ID for the save function
+  // Store session ID and world index for the save function
   propertiesEditor.dataset.sessionId = sessionId;
-  propertiesEditor.dataset.worldIndex = world.index;
+  propertiesEditor.dataset.worldIndex = worldCard.dataset.index;
+
+  // Update users list in properties panel
+  const usersList = document.getElementById('world-properties-users-list');
+  const worldUsersList = worldCard.querySelector('.user-list');
+  
+  if (worldUsersList) {
+    // Clone the users list from the world card
+    usersList.innerHTML = worldUsersList.innerHTML;
+  } else {
+    usersList.innerHTML = '<div class="no-users">No users connected</div>';
+  }
 }
 
 // Helper function to find world data by session ID
