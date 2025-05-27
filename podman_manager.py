@@ -122,19 +122,31 @@ class PodmanManager:
     logger.info("Captured %d lines of output", len(clean_lines))
 
     response_lines = []
-    capture_started = False
-
-    for line in clean_lines:
-      if not capture_started and command.strip() in line:
-        capture_started = True
-      elif capture_started and '>' in line:
-        break
-      elif capture_started:
-        response_lines.append(line)
+    
+    # Special handling for the users command
+    if command.strip() == 'users':
+        # For users command, skip the first line (header) if it exists
+        # and collect all lines until we hit a prompt or empty line
+        start_idx = 1 if len(clean_lines) > 0 and 'Username' in clean_lines[0] else 0
+        for line in clean_lines[start_idx:]:
+            if not line or '>' in line:
+                break
+            if line.strip():  # Only add non-empty lines
+                response_lines.append(line)
+    else:
+        # Default processing for other commands
+        capture_started = False
+        for line in clean_lines:
+            if not capture_started and command.strip() in line:
+                capture_started = True
+            elif capture_started and '>' in line:
+                break
+            elif capture_started:
+                response_lines.append(line)
 
     if response_lines:
-      logger.info("Found %d response lines", len(response_lines))
-      return '\n'.join(response_lines)
+        logger.info("Found %d response lines", len(response_lines))
+        return '\n'.join(response_lines)
 
     logger.warning("No response lines found")
     return ""

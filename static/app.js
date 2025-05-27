@@ -342,6 +342,7 @@ function updateWorlds(worlds) {
     worldDiv.dataset.accessLevel = world.accessLevel;
     worldDiv.dataset.maxUsers = world.maxUsers;
     worldDiv.dataset.index = index; // Add the index to the dataset
+    worldDiv.dataset.usersList = JSON.stringify(world.users_list || []); // Add users list to dataset
 
     // Add click handler
     worldDiv.addEventListener('click', () => selectWorld(world.sessionId));
@@ -798,28 +799,117 @@ function selectWorld(sessionId) {
 }
 
 // Add this new function to update Connected Users panel
-function updateConnectedUsers(worldCard) {
+function updateConnectedUsers(worldCard, forceRefresh = false) {
   const connectedUsersPanel = document.getElementById('connected-users');
   const worldName = worldCard.querySelector('.world-name').textContent;
-  const usersList = worldCard.querySelector('.user-list');
+  const sessionId = worldCard.dataset.sessionId;
   
   // Update panel header
   document.getElementById('connected-users-world-name').textContent = worldName;
   
   // Update users list
   const connectedUsersList = document.getElementById('connected-users-list');
-  if (usersList) {
-    connectedUsersList.innerHTML = usersList.innerHTML;
-    connectedUsersPanel.style.display = 'block';
+  const world = findWorldBySessionId(sessionId);
+  
+  if (world && world.users_list && world.users_list.length > 0) {
+    connectedUsersList.innerHTML = `
+      <div class="users">
+        ${world.users_list.map(user => `
+          <div class="user-card">
+            <div class="user-header">
+              <div class="user-info">
+                <span class="user-name">${user.username}</span>
+                <div class="copy-buttons">
+                  <button onclick="event.stopPropagation(); copyText('${user.username}', 'username')" class="copy-user-btn" title="Copy Username">
+                    Copy Name
+                  </button>
+                  <button onclick="event.stopPropagation(); copyText('${user.userId}', 'userId')" class="copy-user-btn" title="Copy User ID">
+                    Copy ID
+                  </button>
+                </div>
+              </div>
+              <select class="role-select" onchange="handleRoleChange(event, '${user.username}', ${worldCard.dataset.index})">
+                ${AVAILABLE_ROLES.map(role => `
+                  <option value="${role}" ${user.role === role ? 'selected' : ''}>
+                    ${role}
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+            <div class="user-stats">
+              <span class="user-stat" title="Present Status">
+                <i class="status-dot ${user.present ? 'present' : 'away'}"></i>
+                ${user.present ? 'Present' : 'Away'}
+              </span>
+              <span class="user-stat" title="Ping">
+                ${user.ping !== undefined ? `${user.ping}ms` : 'N/A'}
+              </span>
+              <span class="user-stat" title="FPS">
+                ${user.fps !== undefined ? `${user.fps.toFixed(1)} FPS` : 'N/A'}
+              </span>
+              ${user.silenced ? '<span class="user-stat silenced" title="User is silenced">🔇</span>' : ''}
+            </div>
+            <div class="user-actions">
+              <button onclick="event.stopPropagation(); handleUserAction('kick', '${user.username}', ${worldCard.dataset.index})" class="user-action-btn" title="Kick User">
+                Kick
+              </button>
+              <button onclick="event.stopPropagation(); handleUserAction('respawn', '${user.username}', ${worldCard.dataset.index})" class="user-action-btn" title="Respawn User">
+                Respawn
+              </button>
+              <button onclick="event.stopPropagation(); handleUserAction('${user.silenced ? 'unsilence' : 'silence'}', '${user.username}', ${worldCard.dataset.index})" class="user-action-btn ${user.silenced ? 'unsilence' : 'silence'}" title="${user.silenced ? 'Unsilence User' : 'Silence User'}">
+                ${user.silenced ? 'Unsilence' : 'Silence'}
+              </button>
+              <button onclick="event.stopPropagation(); handleUserAction('ban', '${user.username}', ${worldCard.dataset.index})" class="user-action-btn ban" title="Ban User">
+                Ban
+              </button>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
   } else {
     connectedUsersList.innerHTML = '<div class="no-users">No users connected</div>';
-    connectedUsersPanel.style.display = 'block';
   }
+  
+  connectedUsersPanel.style.display = 'block';
 }
 
 // Add function to refresh users list
 function refreshUsersList() {
-  ws.send(JSON.stringify({ type: 'get_worlds' }));
+  const connectedUsersPanel = document.getElementById('connected-users');
+  if (connectedUsersPanel.style.display === 'block') {
+    // Get the currently selected world card
+    const worldsList = document.getElementById('worlds-list');
+    const selectedWorld = worldsList.querySelector('.world-card.selected');
+    if (selectedWorld) {
+      // First send the get_worlds request to update the data
+      ws.send(JSON.stringify({ type: 'get_worlds' }));
+      // After a short delay, update the users panel
+      setTimeout(() => {
+        updateConnectedUsers(selectedWorld, true);
+      }, 1000);
+    }
+  }
+}
+
+// Helper function to find world data by session ID
+function findWorldBySessionId(sessionId) {
+  const worldCard = document.querySelector(`.world-card[data-session-id="${sessionId}"]`);
+  if (!worldCard) return null;
+
+  // Find the matching world data from the card's dataset
+  const index = parseInt(worldCard.dataset.index);
+  const allWorlds = document.getElementById('worlds-list').querySelectorAll('.world-card');
+  const worldsArray = Array.from(allWorlds).map(card => ({
+    sessionId: card.dataset.sessionId,
+    name: card.dataset.name,
+    hidden: card.dataset.hidden === 'true',
+    description: card.dataset.description || '',
+    accessLevel: card.dataset.accessLevel,
+    maxUsers: parseInt(card.dataset.maxUsers),
+    users_list: JSON.parse(card.dataset.usersList || '[]')
+  }));
+
+  return worldsArray.find(world => world.sessionId === sessionId);
 }
 
 // Add this function to handle world selection
