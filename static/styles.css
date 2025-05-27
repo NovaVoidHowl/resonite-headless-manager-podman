@@ -1,4 +1,3 @@
-/* Base styles */
 body {
   background-color: #1a1a1a;
   color: #ffffff;
@@ -9,25 +8,12 @@ body {
   font-family: 'Roboto', sans-serif;
 }
 
-/* Layout and Container styles */
-.layout-container {
-  display: flex;
-  gap: 20px;
-  min-height: 100vh;
-  padding-bottom: 70px;
-}
-
-.main-content {
-  flex: 1;
-}
-
-/* Console and Output styles */
 #output {
   width: 100%;
   height: 400px;
   background-color: #1e1e1e;
   color: #ffffff;
-  font-family: 'Roboto Mono', monospace;
+  font-family: monospace;
   padding: 10px;
   overflow-y: auto;
   margin-bottom: 10px;
@@ -39,13 +25,25 @@ body {
   background-color: #2a2a2a;
   border: 1px solid #3a3a3a;
   color: #ffffff;
-  font-family: 'Roboto Mono', monospace;
+  font-family: monospace;
   border-radius: 4px;
 }
 
 #command-input:focus {
   outline: none;
   border-color: #4CAF50;
+}
+
+#status {
+  margin-bottom: 10px;
+  padding: 15px;
+  border-radius: 5px;
+  font-family: monospace;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 30px);
 }
 
 .command-line {
@@ -56,29 +54,95 @@ body {
   color: #ff0000;
 }
 
-/* Status Bar styles */
-.status-bar {
+#worlds-container {
+  margin: 20px 0;
+  padding: 15px;
+  background-color: #2a2a2a;
+  border-radius: 5px;
+}
+
+#worlds-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 15px;
+  padding: 5px;
+}
+
+.world-card {
+  background-color: #3a3a3a;
+  padding: 15px;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  min-width: 400px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.world-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.world-card.selected {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-left: 3px solid #4CAF50;
+}
+
+.world-card .world-name {
+  font-size: 1.1em;
+  font-weight: bold;
+  color: #4CAF50;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #4a4a4a;
+  margin-bottom: 5px;
+}
+
+.world-stat {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-  width: 100%;
-}
-
-#status {
-  margin-bottom: 0;
-  padding: 15px;
-  border-radius: 5px;
+  color: #ffffff;
   font-family: monospace;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: auto;
 }
 
-.status-text {
-  min-width: 200px;
+.world-stat .label {
+  color: #888;
+}
+
+.world-card span {
+  color: #ffffff;
+  font-family: monospace;
+}
+
+.world-card .world-name {
+  font-weight: bold;
+  color: #4CAF50;
+}
+
+.worlds-header {
+  color: #ffffff;
+  margin-bottom: 10px;
+  font-size: 1.2em;
+  font-weight: 500;
+  font-family: 'Roboto', sans-serif;
+}
+
+.worlds-loading {
+  color: #888;
+  font-style: italic;
+  padding: 10px;
+}
+
+.no-worlds {
+  color: #888;
+  padding: 10px;
+  text-align: center;
+  background-color: #3a3a3a;
+  border-radius: 4px;
 }
 
 .status-indicator {
@@ -120,68 +184,28 @@ body {
 }
 
 @keyframes blink {
-  50% { opacity: 0.5; }
+  50% {
+    opacity: 0.5;
+  }
 }
 
-/* Worlds Container styles */
-#worlds-container {
-  margin: 20px 0;
-  padding: 15px;
-  background-color: #2a2a2a;
-  border-radius: 5px;
-}
-
-#worlds-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 15px;
-  padding: 5px;
-}
-
-.world-card {
-  background-color: #3a3a3a;
-  padding: 15px;
+button {
+  padding: 8px 16px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
   border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
-  min-width: 400px;
   cursor: pointer;
+  font-family: monospace;
+  font-weight: bold;
 }
 
-.world-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  background-color: rgba(255, 255, 255, 0.05);
+button:hover {
+  background-color: #45a049;
 }
 
-.world-card.selected {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-left: 3px solid #4CAF50;
-}
-
-.world-card .world-name {
-  font-size: 1.1em;
-  font-weight: 500;
-  color: #4CAF50;
-  padding-bottom: 5px;
-  border-bottom: 1px solid #4a4a4a;
-  margin-bottom: 5px;
-  font-family: 'Roboto', sans-serif;
-}
-
-/* World Stats and Details */
-.world-stat {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: #ffffff;
-  font-family: 'Roboto Mono', monospace;
-}
-
-.world-stat .label {
-  color: #888;
+button:active {
+  background-color: #3d8b40;
 }
 
 .world-details {
@@ -199,22 +223,116 @@ body {
   margin-top: 5px;
 }
 
-/* Session ID styles */
-.session-id-container {
+.world-tags {
+  grid-column: 1 / -1;
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tag {
+  background-color: #4a4a4a;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.9em;
+}
+
+.user-list {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  padding: 10px;
+  border-top: 1px solid #3a3a3a;
+}
+
+.user-list .label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.user-list .users {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  width: 100%;
+  padding-right: 10px;
+}
+
+.user-list .user {
+  background-color: #4CAF50;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.9em;
 }
 
 .session-id {
-  font-family: 'Roboto Mono', monospace;
+  font-family: monospace;
   font-size: 0.8em;
   color: #888;
   word-break: break-all;
   flex-grow: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.console-section {
+  margin-top: 20px;
+  display: none;
+  /* Hidden by default */
+}
+
+.toggle-console {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 1px solid #4CAF50;
+  padding: 8px 16px;
+  color: #4CAF50;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toggle-console:hover {
+  background-color: #4CAF5022;
+}
+
+.toggle-console .icon {
+  display: inline-block;
+  transition: transform 0.2s;
+  transform: rotate(-90deg);
+  /* Point right by default */
+}
+
+.toggle-console.expanded .icon {
+  transform: rotate(-180deg);
+  /* Point up when expanded */
+}
+
+.console-section #output {
+  width: 100%;
+  height: 400px;
+  background-color: #1e1e1e;
+  color: #ffffff;
+  font-family: monospace;
+  padding: 10px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.console-section #command-input {
+  width: 80%;
+  padding: 8px 12px;
+  background-color: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  color: #ffffff;
+  font-family: monospace;
+  border-radius: 4px;
+}
+
+.session-id-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 .copy-button {
@@ -243,60 +361,98 @@ body {
   background-color: #4CAF5044;
 }
 
-/* Button styles */
-button {
-  padding: 8px 16px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
+/* Add new styles for config section */
+.config-section {
+  margin-top: 20px;
+  background-color: #2a2a2a;
+  padding: 15px;
+  border-radius: 5px;
+  display: none;
+  /* Hidden by default */
+}
+
+.config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+#config-editor {
+  width: 100%;
+  height: 400px;
+  background-color: #1e1e1e;
+  color: #ffffff;
+  font-family: monospace;
+  padding: 10px;
+  border: 1px solid #3a3a3a;
   border-radius: 4px;
-  cursor: pointer;
-  font-family: 'Roboto', sans-serif;
-  font-weight: 500;
+  resize: vertical;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
 }
 
-button:hover {
-  background-color: #45a049;
+.config-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
 }
 
-button:active {
-  background-color: #3d8b40;
+.save-button {
+  background-color: #4CAF50;
 }
 
-/* Console and Config Toggle styles */
+.save-button:disabled {
+  background-color: #666;
+  cursor: not-allowed;
+}
+
+.error-message {
+  color: #ff6b6b;
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #ff6b6b22;
+  border-radius: 4px;
+  display: none;
+}
+
+/* Add new styles after existing styles */
+.toggle-buttons {
+  display: flex;
+  gap: 10px;
+  margin: 20px 0;
+}
+
 .toggle-console {
+  /* Update toggle button styles */
   display: flex;
   align-items: center;
   gap: 8px;
-  background: none;
-  border: 1px solid #4CAF50;
-  padding: 6px 12px;
-  color: #4CAF50;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 0.9em;
-}
-
-.toggle-console:hover {
-  background-color: #4CAF5022;
-}
-
-.toggle-console.expanded {
-  background-color: #4CAF50;
-  color: white;
 }
 
 .toggle-console .icon {
   display: inline-block;
   transition: transform 0.2s;
   transform: rotate(-90deg);
+  /* Point right by default */
 }
 
 .toggle-console.expanded .icon {
   transform: rotate(-180deg);
+  /* Point up when expanded */
 }
 
-/* Sidebar styles */
+.layout-container {
+  display: flex;
+  gap: 20px;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+}
+
 .sidebar {
   width: 300px;
   background-color: transparent;
@@ -319,7 +475,6 @@ button:active {
   align-items: center;
 }
 
-/* Settings styles */
 .setting-group {
   margin-bottom: 15px;
 }
@@ -332,8 +487,6 @@ button:active {
   display: block;
   color: #888;
   margin-bottom: 5px;
-  font-family: 'Roboto', sans-serif;
-  font-weight: 500;
 }
 
 .setting-input {
@@ -355,51 +508,35 @@ button:active {
   font-size: 0.9em;
   color: #666;
   margin-top: 5px;
-  font-family: 'Roboto', sans-serif;
-  font-weight: 300;
 }
 
-/* User Card styles */
-.user-list {
-  grid-column: 1 / -1;
-  margin-top: 10px;
-  padding: 10px;
-  border-top: 1px solid #3a3a3a;
-}
-
-.user-list .label {
-  display: block;
-  margin-bottom: 10px;
-  color: #888;
-}
-
+/* Add these styles in the <style> section */
 .user-card {
   background-color: #2a2a2a;
   border-radius: 4px;
-  padding: 10px;
+  padding: 8px;
   margin: 5px 0;
-  width: calc(100% - 20px);
+  width: calc(100% - 16px);
 }
 
 .user-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 4px;
-  gap: 10px;
-}
-
-.user-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
 }
 
 .user-name {
+  font-weight: bold;
   color: #ffffff;
-  font-family: 'Roboto', sans-serif;
-  font-weight: 500;
+}
+
+.user-role {
+  font-size: 0.8em;
+  padding: 2px 6px;
+  background-color: #4CAF50;
+  border-radius: 10px;
+  color: white;
 }
 
 .user-stats {
@@ -435,78 +572,455 @@ button:active {
   color: #ff6b6b;
 }
 
-/* User Actions styles */
-.user-actions {
+.user-list {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  padding: 10px;
+  border-top: 1px solid #3a3a3a;
+}
+
+.user-list .label {
+  display: block;
+  margin-bottom: 10px;
+  color: #888;
+}
+
+.users {
   display: flex;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 10px;
 }
 
-.user-action-btn {
-  padding: 4px 8px;
-  font-size: 0.8em;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  background-color: #4a4a4a;
-  color: white;
-  flex: 1;
-  min-width: 60px;
+.last-updated {
+  font-size: 0.9em;
+  color: #888;
+  font-style: italic;
 }
 
-.user-action-btn:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.1);
+#output,
+#command-input,
+.session-id,
+.world-stat,
+.user-card {
+  font-family: 'Roboto Mono', monospace;
 }
 
-.user-action-btn:active {
-  transform: translateY(0);
-  filter: brightness(0.9);
-}
-
-.user-action-btn.silence {
-  background-color: #ff9800;
-}
-
-.user-action-btn.unsilence {
-  background-color: #4CAF50;
-}
-
-.user-action-btn.ban {
-  background-color: #f44336;
-}
-
-/* Role Select styles */
-.role-select {
-  background-color: #2a2a2a;
+.worlds-header,
+.sidebar-header {
   color: #ffffff;
+  margin-bottom: 10px;
+  font-size: 1.2em;
+  font-weight: 500;
+  font-family: 'Roboto', sans-serif;
+}
+
+button {
+  font-family: 'Roboto', sans-serif;
+  font-weight: 500;
+}
+
+#config-editor {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 14px;
+}
+
+.world-card .world-name {
+  font-family: 'Roboto', sans-serif;
+  font-weight: 500;
+}
+
+.user-name {
+  font-family: 'Roboto', sans-serif;
+  font-weight: 500;
+}
+
+.setting-label {
+  font-family: 'Roboto', sans-serif;
+  font-weight: 500;
+}
+
+.setting-description {
+  font-family: 'Roboto', sans-serif;
+  font-weight: 300;
+}
+
+@media (max-width: 480px) {
+  .world-card {
+    min-width: 300px;
+  }
+
+  #worlds-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Add these new styles and replace existing related styles */
+.footer-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #2a2a2a;
+  padding: 8px 20px;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+}
+
+.footer-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+}
+
+.overlay-panel {
+  position: fixed;
+  bottom: 70px;
+  left: 0;
+  right: 0;
+  background-color: #1a1a1a;
+  border-top: 1px solid #3a3a3a;
+  display: none;
+  z-index: 99;
+  height: 50vh;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.panel-content {
+  height: 100%;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* Console specific styles */
+.console-section .panel-content {
+  gap: 10px;
+  padding-bottom: 50px;
+}
+
+.console-section #output {
+  flex: 1;
+  margin: 0;
+}
+
+.console-section .input-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.console-section #command-input {
+  flex: 1;
+  margin: 0;
+}
+
+/* Config section specific styles */
+.config-section .panel-content {
+  gap: 15px;
+}
+
+.config-section #config-editor {
+  flex: 1;
+  margin: 0;
+  resize: none;
+}
+
+/* Update main content to account for footer */
+.layout-container {
+  padding-bottom: 70px;
+  /* Height of footer + some extra space */
+}
+
+/* Update toggle button styles */
+.toggle-console {
+  background: none;
+  border: 1px solid #4CAF50;
+  color: #4CAF50;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+}
+
+.toggle-console:hover {
+  background-color: #4CAF5022;
+}
+
+.toggle-console.expanded {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.editor-container {
+  position: relative;
+  flex: 1;
+  display: flex;
+  background-color: #1e1e1e;
   border: 1px solid #3a3a3a;
   border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 0.9em;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.line-numbers {
+  width: 50px;
+  padding: 10px 5px;
+  background-color: #252525;
+  border-right: 1px solid #3a3a3a;
+  color: #666;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 14px;
+  text-align: right;
+  user-select: none;
+  overflow-y: hidden;
+  box-sizing: border-box;
+  height: 100%;
+}
+
+/* Remove white-space: pre from line numbers */
+.line-numbers div {
+  padding-right: 8px;
+}
+
+#config-editor {
+  flex: 1;
+  margin: 0;
+  border: none;
+  border-radius: 0 4px 4px 0;
+  padding: 10px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-y: scroll;
+  overflow-x: auto;
+  resize: none;
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  box-sizing: border-box;
+  height: 100%;
+}
+
+#config-editor-highlight {
+  position: absolute;
+  left: 60px;
+  /* Width of line numbers + padding */
+  right: 0;
+  height: 21px;
+  /* Should match line-height */
+  background-color: #2d2d2d;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#config-editor {
+  caret-color: #fff;
+  /* Makes cursor visible */
+}
+
+/* Style for the current line highlight */
+#config-editor-highlight {
+  position: absolute;
+  width: 100%;
+  background-color: #2d2d2d;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Ensure editor content stays above highlight */
+#config-editor {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
+
+/* Update line numbers container to accommodate highlight */
+.line-numbers {
+  position: relative;
+  z-index: 1;
+}
+
+/* Add style for highlighted line number */
+.line-numbers .current-line {
+  color: #fff;
+  background-color: #2d2d2d;
+}
+
+/* Add these new styles */
+.line-numbers div {
+  height: 21px;
+  padding-right: 8px;
+}
+
+/* Ensure both scrollbars appear */
+.editor-container:hover #config-editor::-webkit-scrollbar,
+.editor-container:hover .line-numbers::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+/* Style the scrollbars */
+#config-editor::-webkit-scrollbar,
+.line-numbers::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+#config-editor::-webkit-scrollbar-track,
+.line-numbers::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+#config-editor::-webkit-scrollbar-thumb,
+.line-numbers::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border-radius: 5px;
+}
+
+#config-editor::-webkit-scrollbar-thumb:hover,
+.line-numbers::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
+}
+
+.selected-world {
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+#selected-world-name {
+  font-weight: 500;
+  color: #4CAF50;
+}
+
+/* Add after the .sidebar styles */
+.settings-card {
+  background: #2a2a2a;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.settings-card:last-child {
+  margin-bottom: 0;
+}
+
+/* Add these styles after the .setting-input styles */
+
+/* Custom checkbox styling */
+.setting-row input[type="checkbox"] {
+  /* Hide the default checkbox */
+  position: absolute;
+  opacity: 0;
   cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+/* Custom checkbox container */
+.setting-row {
+  position: relative;
+  padding: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Create custom checkbox */
+.setting-row .checkbox-custom {
+  position: relative;
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  background-color: #1e1e1e;
+  border: 2px solid #3a3a3a;
+  border-radius: 4px;
   transition: all 0.2s;
+  cursor: pointer;
 }
 
-.role-select:hover {
+/* Checkbox hover state */
+.setting-row input[type="checkbox"]:hover+.checkbox-custom {
   border-color: #4CAF50;
 }
 
-.role-select:focus {
-  outline: none;
+/* Checkbox checked state */
+.setting-row input[type="checkbox"]:checked+.checkbox-custom {
+  background-color: #4CAF50;
   border-color: #4CAF50;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
-.role-select option {
-  background-color: #1a1a1a;
-  color: #ffffff;
-  padding: 8px;
+/* Create checkmark */
+.setting-row .checkbox-custom:after {
+  content: '';
+  position: absolute;
+  display: none;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 
-/* Friend Requests styles */
+/* Show checkmark when checked */
+.setting-row input[type="checkbox"]:checked+.checkbox-custom:after {
+  display: block;
+}
+
+/* Focus state */
+.setting-row input[type="checkbox"]:focus+.checkbox-custom {
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
+}
+
+/* Update the checkbox styling */
+.checkbox-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.setting-row {
+  position: relative;
+  padding: 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* Update selector to use the new wrapper */
+.checkbox-wrapper input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+/* Update selectors for hover/checked states */
+.checkbox-wrapper input[type="checkbox"]:hover+.checkbox-custom {
+  border-color: #4CAF50;
+}
+
+.checkbox-wrapper input[type="checkbox"]:checked+.checkbox-custom {
+  background-color: #4CAF50;
+  border-color: #4CAF50;
+}
+
+.checkbox-wrapper input[type="checkbox"]:checked+.checkbox-custom:after {
+  display: block;
+}
+
+.checkbox-wrapper input[type="checkbox"]:focus+.checkbox-custom {
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
+}
+
 .friend-requests-card {
   margin-top: 16px;
 }
@@ -554,7 +1068,235 @@ button:active {
   transform: translateY(0);
 }
 
-/* Ban System styles */
+.friend-requests-card {
+  margin-top: 16px;
+}
+
+.friend-requests-card .sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.friend-requests-card .request-count {
+  background-color: #4CAF50;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.9em;
+  font-weight: normal;
+}
+
+.no-requests {
+  color: #888;
+  text-align: center;
+  padding: 12px;
+  font-style: italic;
+}
+
+.deny-button {
+  background-color: #f44336;
+  /* Red color */
+}
+
+.deny-button:hover {
+  background-color: #e53935;
+  /* Slightly darker red on hover */
+}
+
+.deny-button:active {
+  background-color: #d32f2f;
+  /* Even darker red when clicked */
+}
+
+/* Add these styles after the world-properties styles */
+
+.world-controls {
+  margin: 10px 0 15px 0;
+}
+
+.controls-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
+.control-button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9em;
+}
+
+.control-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.control-button:active {
+  transform: translateY(0);
+  filter: brightness(0.9);
+}
+
+.restart-button {
+  background-color: #ff9800;
+  /* Amber color for restart */
+}
+
+.save-button {
+  background-color: #4CAF50;
+  /* Green color for save */
+}
+
+.close-button {
+  background-color: #f44336;
+  /* Red color for close */
+}
+
+.restart-button:hover {
+  background-color: #ffa726;
+}
+
+.save-button:hover {
+  background-color: #66bb6a;
+}
+
+.close-button:hover {
+  background-color: #ef5350;
+}
+
+.restart-button:active {
+  background-color: #f57c00;
+}
+
+.save-button:active {
+  background-color: #43a047;
+}
+
+.close-button:active {
+  background-color: #e53935;
+}
+
+/* Add these new styles after the status-* styles */
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+#status {
+  margin-bottom: 0;
+  /* Override previous margin */
+  width: auto;
+  /* Override previous width */
+}
+
+.server-controls {
+  display: flex;
+  gap: 10px;
+  padding: 15px;
+  background-color: #2a2a2a;
+  border-radius: 5px;
+}
+
+/* Update existing control-button styles to be more compact for the header */
+.server-controls .control-button {
+  padding: 8px 16px;
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+
+/* Add these styles after the .settings-card styles */
+.collapsible {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.collapse-icon {
+  transition: transform 0.3s ease;
+}
+
+.collapsible.collapsed .collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.card-content {
+  transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
+  max-height: 500px;
+  opacity: 1;
+  overflow: hidden;
+}
+
+.card-content.collapsed {
+  max-height: 0;
+  opacity: 0;
+}
+
+.system-stats {
+  display: flex;
+  gap: 15px;
+  margin-left: 15px;
+  padding-left: 15px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.9em;
+}
+
+.stat-label {
+  color: #888;
+}
+
+.stat-value {
+  color: #4CAF50;
+  font-weight: 500;
+}
+
+/* Update the existing status styles to accommodate the new layout */
+#status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.status-text {
+  min-width: 200px;
+}
+
+.clear-denied-button {
+  margin-top: 15px;
+  width: 100%;
+  padding: 10px;
+  background-color: #f44336;
+  /* Red color to indicate destructive action */
+}
+
+.clear-denied-button:hover {
+  background-color: #e53935;
+}
+
+.clear-denied-button:active {
+  background-color: #d32f2f;
+}
+
+/* Add these styles at the end of the file */
 .banned-users-card {
   margin-top: 16px;
 }
@@ -588,6 +1330,33 @@ button:active {
   font-style: italic;
 }
 
+.unban-button {
+  padding: 6px 12px;
+  font-size: 0.9em;
+  min-width: 80px;
+  background-color: #f44336;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.unban-button:hover {
+  transform: translateY(-1px);
+  opacity: 0.9;
+  background-color: #e53935;
+}
+
+.unban-button:active {
+  transform: translateY(0);
+  background-color: #d32f2f;
+}
+
+.no-bans {
+  color: #888;
+  text-align: center;
+  padding: 12px;
+  font-style: italic;
+}
+
+/* Add these styles with the other banned users styles */
 .ban-form {
   margin-bottom: 16px;
   display: flex;
@@ -619,124 +1388,172 @@ button:active {
   transform: translateY(0);
 }
 
-.unban-button {
-  padding: 6px 12px;
-  font-size: 0.9em;
-  min-width: 80px;
-  background-color: #f44336;
-  transition: transform 0.2s, opacity 0.2s;
+/* Add these styles after the user-card styles */
+.user-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
 }
 
-.unban-button:hover {
+.user-action-btn {
+  padding: 4px 8px;
+  font-size: 0.8em;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background-color: #4a4a4a;
+  color: white;
+  flex: 1;
+  min-width: 60px;
+}
+
+.user-action-btn:hover {
   transform: translateY(-1px);
-  opacity: 0.9;
-  background-color: #e53935;
+  filter: brightness(1.1);
 }
 
-.unban-button:active {
+.user-action-btn:active {
   transform: translateY(0);
-  background-color: #d32f2f;
+  filter: brightness(0.9);
 }
 
-/* Loading Overlay styles */
-.loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.7);
+.user-action-btn.silence {
+  background-color: #ff9800;
+}
+
+.user-action-btn.unsilence {
+  background-color: #4CAF50;
+}
+
+.user-action-btn.ban {
+  background-color: #f44336;
+}
+
+/* Update the user-card style to accommodate the new buttons */
+.user-card {
+  background-color: #2a2a2a;
+  border-radius: 4px;
+  padding: 10px;
+  margin: 5px 0;
+  width: calc(100% - 20px);
+}
+
+/* Add these styles after the .user-role styles */
+.role-select {
+  background-color: #2a2a2a;
+  color: #ffffff;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.role-select:hover {
+  border-color: #4CAF50;
+}
+
+.role-select:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.role-select option {
+  background-color: #1a1a1a;
+  color: #ffffff;
+  padding: 8px;
+}
+
+/* Update the user-header style to accommodate the dropdown */
+.user-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  gap: 10px;
+}
+
+/* Add these styles after the save-button styles */
+.property-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.property-buttons button {
+  flex: 1;
+  padding: 10px;
+}
+
+.cancel-button {
+  background-color: #666;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-button:hover {
+  background-color: #777;
+  transform: translateY(-1px);
+}
+
+.cancel-button:active {
+  background-color: #555;
+  transform: translateY(0);
+}
+
+/* Add these styles after the user-card styles */
+.user-info {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-}
-
-.loading-overlay.hidden {
-  display: none;
-}
-
-.loading-indicator {
-  width: 40px;
-  height: 40px;
-  border: 3px solid #3a3a3a;
-  border-top: 3px solid #4CAF50;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 10px;
-}
-
-.loading-text {
-  color: #ffffff;
-  font-size: 1.1em;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Error Toast styles */
-.error-toast {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: #ff4444;
-  color: white;
-  padding: 12px 20px;
-  border-radius: 4px;
-  z-index: 10000;
-  display: none;
-  align-items: center;
-  gap: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.error-toast.show {
-  display: flex;
-}
-
-.error-toast-message {
+  gap: 4px;
   flex: 1;
 }
 
-.error-toast-close {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 0;
-  margin: 0;
-  width: 24px;
-  height: 24px;
+.copy-buttons {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  gap: 4px;
 }
 
-.error-toast-close:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
+.copy-user-btn {
+  padding: 2px 6px;
+  font-size: 0.8em;
+  background: none;
+  border: 1px solid #4CAF50;
+  color: #4CAF50;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-/* Copy Success Message styles */
+.copy-user-btn:hover {
+  background-color: #4CAF5022;
+}
+
+.copy-user-btn:active {
+  background-color: #4CAF5044;
+}
+
+/* Add styles for the success message */
 .copy-success-message {
   position: fixed;
-  top: 20px;
+  bottom: 20px;
   right: 20px;
   background-color: #4CAF50;
   color: white;
-  padding: 12px 20px;
+  padding: 10px 20px;
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  font-size: 0.9em;
   opacity: 0;
-  transform: translateY(-10px);
-  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-  z-index: 1001;
-  pointer-events: none;
+  transform: translateY(20px);
+  transition: all 0.3s ease;
+  z-index: 1000;
 }
 
 .copy-success-message.show {
@@ -744,71 +1561,168 @@ button:active {
   transform: translateY(0);
 }
 
-/* Custom Checkbox styles */
-.checkbox-wrapper {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
+/* Update the user-header style to accommodate the new layout */
+.user-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+  gap: 10px;
 }
 
-.checkbox-wrapper input[type="checkbox"] {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-  height: 0;
-  width: 0;
-}
+/* Error Toast styles */
 
-.checkbox-custom {
-  position: relative;
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  background-color: #1e1e1e;
-  border: 2px solid #3a3a3a;
+.error-toast {
+
+  position: fixed;
+
+  top: 20px;
+
+  left: 50%;
+
+  transform: translateX(-50%);
+
+  background-color: #ff4444;
+
+  color: white;
+
+  padding: 12px 20px;
+
   border-radius: 4px;
-  transition: all 0.2s;
-  cursor: pointer;
-}
 
-.checkbox-wrapper input[type="checkbox"]:hover + .checkbox-custom {
-  border-color: #4CAF50;
-}
+  z-index: 10000;
 
-.checkbox-wrapper input[type="checkbox"]:checked + .checkbox-custom {
-  background-color: #4CAF50;
-  border-color: #4CAF50;
-}
-
-.checkbox-custom:after {
-  content: '';
-  position: absolute;
   display: none;
-  left: 6px;
-  top: 2px;
-  width: 5px;
-  height: 10px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+
+  align-items: center;
+
+  gap: 10px;
+
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
 }
 
-.checkbox-wrapper input[type="checkbox"]:checked + .checkbox-custom:after {
-  display: block;
+
+.error-toast.show {
+
+  display: flex;
+
 }
 
-.checkbox-wrapper input[type="checkbox"]:focus + .checkbox-custom {
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
+
+.error-toast-message {
+
+  flex: 1;
+
 }
 
-/* Media Queries */
-@media (max-width: 480px) {
-  .world-card {
-    min-width: 300px;
-  }
 
-  #worlds-list {
-    grid-template-columns: 1fr;
-  }
+.error-toast-close {
+
+  background: none;
+
+  border: none;
+
+  color: white;
+
+  font-size: 20px;
+
+  cursor: pointer;
+
+  padding: 0;
+
+  margin: 0;
+
+  width: 24px;
+
+  height: 24px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
 }
+
+
+.error-toast-close:hover {
+
+  background-color: rgba(255, 255, 255, 0.1);
+
+  border-radius: 50%;
+
+}
+
+/* Loading Overlay styles */
+
+.loading-overlay {
+
+  position: fixed;
+
+  top: 0;
+
+  left: 0;
+
+  width: 100%;
+
+  height: 100%;
+
+  background-color: rgba(0, 0, 0, 0.7);
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  justify-content: center;
+
+  z-index: 10000;
+
+}
+
+
+.loading-overlay.hidden {
+
+  display: none;
+
+}
+
+
+.loading-indicator {
+
+  width: 40px;
+
+  height: 40px;
+
+  border: 3px solid #3a3a3a;
+
+  border-top: 3px solid #4CAF50;
+
+  border-radius: 50%;
+
+  animation: spin 1s linear infinite;
+
+  margin-bottom: 10px;
+
+}
+
+
+.loading-text {
+
+  color: #ffffff;
+
+  font-size: 1.1em;
+
+}
+
+
+@keyframes spin {
+
+  0% { transform: rotate(0deg); }
+
+  100% { transform: rotate(360deg); }
+
+}
+
