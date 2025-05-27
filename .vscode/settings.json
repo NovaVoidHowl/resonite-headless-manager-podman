@@ -5,6 +5,7 @@
     "dotenv",
     "fastapi",
     "frontmatter",
+    "getpid",
     "listbans",
     "mdformat",
     "psutil",
