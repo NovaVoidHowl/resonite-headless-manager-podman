@@ -95,6 +95,14 @@ This application provides real-time monitoring and control of your Resonite worl
   - Direct access to server console
   - Real-time command output
 
+- **WebSocket API**
+  - Programmatic control via WebSocket API
+  - Structured JSON message format
+  - Real-time updates and monitoring
+  - See [API.md](API.md) for full documentation
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 ## Installation
 
 > [!TIP]
