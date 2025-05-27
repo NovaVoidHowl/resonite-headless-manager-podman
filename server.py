@@ -18,7 +18,9 @@ import re
 import threading
 import time
 from contextlib import suppress
-from typing import Any, Dict
+from typing import Any, Dict, List, Set
+from dataclasses import dataclass
+from datetime import datetime
 
 import psutil
 from dotenv import load_dotenv
@@ -61,14 +63,38 @@ app.add_middleware(
   allow_headers=["*"],
 )
 
-# Store active WebSocket connections
-active_connections = []
-
 # Initialize PodmanManager with container name from .env
 podman_manager = PodmanManager(
   os.getenv('CONTAINER_NAME', 'resonite-headless')  # Fallback to 'resonite-headless' if not set
 )
 
+@dataclass
+class ConnectionManager:
+    """Manage WebSocket connections for a specific type"""
+    active_connections: Set[WebSocket] = None
+    
+    def __init__(self):
+        self.active_connections = set()
+    
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.add(websocket)
+    
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+    
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections.copy():
+            try:
+                await safe_send_json(connection, message)
+            except Exception:
+                await self.disconnect(connection)
+
+# Create connection managers for different types of connections
+logs_manager = ConnectionManager()
+status_manager = ConnectionManager()
+worlds_manager = ConnectionManager()
+commands_manager = ConnectionManager()
 
 # Add config file handling
 def load_config() -> Dict[Any, Any]:
@@ -510,32 +536,83 @@ async def handle_websocket_message(websocket: WebSocket, message: str):
       })
 
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-  """Handle WebSocket connections and message routing"""
-  await websocket.accept()
-  active_connections.append(websocket)
-  monitor_task = None
+@app.websocket("/ws/logs")
+async def logs_endpoint(websocket: WebSocket):
+    """Handle container logs WebSocket connections"""
+    await logs_manager.connect(websocket)
+    monitor_task = None
 
-  try:
-    monitor_task = asyncio.create_task(monitor_docker_output(websocket))
+    try:
+        monitor_task = asyncio.create_task(monitor_docker_output(websocket))
+        while await is_websocket_connected(websocket):
+            await asyncio.sleep(1)  # Keep connection alive
 
-    while await is_websocket_connected(websocket):
-      message = await websocket.receive_text()
-      await handle_websocket_message(websocket, message)
+    except WebSocketDisconnect:
+        logger.info("Logs WebSocket disconnected normally")
+    except Exception as e:
+        logger.error("Logs WebSocket error: %s", str(e))
+    finally:
+        logs_manager.disconnect(websocket)
+        if monitor_task:
+            monitor_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await monitor_task
 
-  except WebSocketDisconnect:
-    logger.info("WebSocket disconnected normally")
-  except (ConnectionError, RuntimeError) as e:
-    logger.error("WebSocket error: %s", str(e))
-  finally:
-    if websocket in active_connections:
-      active_connections.remove(websocket)
-    if monitor_task:
-      monitor_task.cancel()
-      with suppress(asyncio.CancelledError):
-        await monitor_task
+@app.websocket("/ws/status")
+async def status_endpoint(websocket: WebSocket):
+    """Handle status monitoring WebSocket connections"""
+    await status_manager.connect(websocket)
+    
+    try:
+        while await is_websocket_connected(websocket):
+            async with request_locks['status']:
+                await handle_status(websocket)
+            await asyncio.sleep(1)  # Update every second
 
+    except WebSocketDisconnect:
+        logger.info("Status WebSocket disconnected normally")
+    except Exception as e:
+        logger.error("Status WebSocket error: %s", str(e))
+    finally:
+        status_manager.disconnect(websocket)
+
+@app.websocket("/ws/worlds")
+async def worlds_endpoint(websocket: WebSocket):
+    """Handle worlds list WebSocket connections"""
+    await worlds_manager.connect(websocket)
+    
+    try:
+        while await is_websocket_connected(websocket):
+            message = await websocket.receive_text()
+            data = json.loads(message)
+            if data.get("type") == "get_worlds":
+                await handle_worlds(websocket)
+
+    except WebSocketDisconnect:
+        logger.info("Worlds WebSocket disconnected normally")
+    except Exception as e:
+        logger.error("Worlds WebSocket error: %s", str(e))
+    finally:
+        worlds_manager.disconnect(websocket)
+
+@app.websocket("/ws/command")
+async def command_endpoint(websocket: WebSocket):
+    """Handle command WebSocket connections"""
+    await commands_manager.connect(websocket)
+    
+    try:
+        while await is_websocket_connected(websocket):
+            message = await websocket.receive_text()
+            data = json.loads(message)
+            if data.get("type") == "command":
+                await handle_command(websocket, data["command"])
+
+    except WebSocketDisconnect:
+        logger.info("Command WebSocket disconnected normally")
+    except Exception as e:
+        logger.error("Command WebSocket error: %s", str(e))
+    finally:
+        commands_manager.disconnect(websocket)
 
 async def is_websocket_connected(websocket: WebSocket) -> bool:
   """Check if the websocket is still connected and in a valid state"""
@@ -596,17 +673,16 @@ async def monitor_docker_output(websocket: WebSocket):
 async def send_output(websocket: WebSocket, output):
   """Send output to WebSocket"""
   try:
-    if await is_websocket_connected(websocket):
-      # Ensure the output is properly encoded
-      if not isinstance(output, str):
+    if not isinstance(output, str):
         output = str(output)
 
-      await safe_send_json(websocket, {
+    await logs_manager.broadcast({
         "type": "container_output",
-        "output": output
-      })
-  except (WebSocketDisconnect, ConnectionError) as e:
-    logger.error("Error sending output: %s", str(e))
+        "output": output,
+        "timestamp": datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error("Error broadcasting output: %s", str(e))
 
 
 @app.get("/config")

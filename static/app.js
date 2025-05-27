@@ -1,4 +1,7 @@
-let ws;
+let wsLogs;
+let wsStatus;
+let wsWorlds;
+let wsCommand;
 const output = document.getElementById('output');
 const commandInput = document.getElementById('command-input');
 const statusDiv = document.getElementById('status');
@@ -44,110 +47,92 @@ function showError(message) {
 }
 
 function connect() {
-  // Use port 8000 for WebSocket connections
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsHost = window.location.hostname;
-  ws = new WebSocket(`${wsProtocol}//${wsHost}:8000/ws`);
 
-  ws.onopen = function () {
-    const statusDiv = document.getElementById('status');
-    const statusText = statusDiv.querySelector('.status-text');
-    statusDiv.classList.remove('status-connecting', 'status-running', 'status-stopped');
-    statusDiv.classList.add('status-connecting');
-    statusText.textContent = 'Connected - Checking Status...';
-
-    // Request initial status and worlds
-    ws.send(JSON.stringify({ type: 'get_status' }));
-    ws.send(JSON.stringify({ type: 'get_worlds' }));
-
-    // Initial friend requests check
-    ws.send(JSON.stringify({
-      type: 'command',
-      command: 'friendRequests'
-    }));
-
-    // Initial banned users check
-    ws.send(JSON.stringify({
-      type: 'command',
-      command: 'listbans'
-    }));
-
-    // Set up periodic status updates with the configurable interval
-    refreshTimer = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'get_status' }));
-        ws.send(JSON.stringify({ type: 'get_worlds' }));
-      }
-    }, refreshInterval);
-
-    // Set up periodic friend requests updates
-    friendRequestsTimer = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'command',
-          command: 'friendRequests'
-        }));
-      }
-    }, friendRequestsInterval);
-
-    // Set up periodic banned users updates
-    bannedUsersTimer = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'command',
-          command: 'listbans'
-        }));
-      }
-    }, bannedUsersInterval);
-
-    // Initialize card states
-    initializeCardStates();
-  };
-
-  ws.onclose = function () {
-    const statusDiv = document.getElementById('status');
-    const statusText = statusDiv.querySelector('.status-text');
-    statusDiv.classList.remove('status-connecting', 'status-running', 'status-stopped');
-    statusDiv.classList.add('status-connecting');
-    statusText.textContent = 'Disconnected - Reconnecting...';
-    setTimeout(connect, 1000);
-  };
-
-  ws.onmessage = function (event) {
-    let data;
-    try {
-      // First try to parse as regular JSON
-      if (typeof event.data === 'string') {
-        data = JSON.parse(event.data);
-      }
-      // If it's a blob, handle it asynchronously
-      else if (event.data instanceof Blob) {
-        // event.data.text().then(text => {
-        //   try {
-        //     data = JSON.parse(text);
-        //     handleMessage(data);
-        //   } catch (e) {
-        //     console.error('Failed to parse blob data:', e);
-        //     appendOutput(`Error: Failed to parse server message - ${e.message}`, 'error');
-        //   }
-        // });
-        return;
-      }
-      // Handle the parsed data
-      if (data) {
-        handleMessage(data);
-      }
-    } catch (e) {
-      console.error('Failed to parse message:', e);
-      appendOutput(`Error: Failed to parse server message - ${e.message}`, 'error');
+  // Connect to logs endpoint (container output)
+  wsLogs = new WebSocket(`${wsProtocol}//${wsHost}:8000/ws/logs`);
+  wsLogs.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    if (data.type === 'container_output') {
+      appendOutput(data.output);
     }
   };
+  wsLogs.onclose = () => setTimeout(() => connect(), 1000);
+
+  // Connect to status endpoint
+  wsStatus = new WebSocket(`${wsProtocol}//${wsHost}:8000/ws/status`);
+  wsStatus.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    if (data.type === 'status_update') {
+      updateStatus(data.status);
+    } else if (data.type === 'error') {
+      showError(data.message);
+    }
+  };
+  wsStatus.onclose = () => setTimeout(() => connect(), 1000);
+
+  // Connect to worlds endpoint
+  wsWorlds = new WebSocket(`${wsProtocol}//${wsHost}:8000/ws/worlds`);
+  wsWorlds.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    if (data.type === 'worlds_update') {
+      updateWorlds(data.output);
+    } else if (data.type === 'error') {
+      showError(data.message);
+    }
+  };
+  wsWorlds.onclose = () => setTimeout(() => connect(), 1000);
+
+  // Connect to command endpoint
+  wsCommand = new WebSocket(`${wsProtocol}//${wsHost}:8000/ws/command`);
+  wsCommand.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    if (data.type === 'command_response') {
+      if (data.command === 'friendRequests') {
+        updateFriendRequests(data.output);
+      }
+      console.log('command_response', data.output);
+    } else if (data.type === 'bans_update') {
+      updateBannedUsers(data.bans);
+    } else if (data.type === 'error') {
+      showError(data.message);
+    }
+  };
+  wsCommand.onclose = () => setTimeout(() => connect(), 1000);
+
+  // Set up periodic status updates
+  setInterval(() => {
+    if (wsWorlds && wsWorlds.readyState === WebSocket.OPEN) {
+      wsWorlds.send(JSON.stringify({ type: 'get_worlds' }));
+    }
+  }, refreshInterval);
+
+  // Set up periodic friend requests updates
+  setInterval(() => {
+    if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
+      wsCommand.send(JSON.stringify({
+        type: 'command',
+        command: 'friendRequests'
+      }));
+    }
+  }, friendRequestsInterval);
+
+  // Set up periodic banned users updates
+  setInterval(() => {
+    if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
+      wsCommand.send(JSON.stringify({
+        type: 'command',
+        command: 'listbans'
+      }));
+    }
+  }, bannedUsersInterval);
 }
 
 function sendCommand() {
   const command = commandInput.value.trim();
-  if (command) {
-    ws.send(JSON.stringify({
+  if (command && wsCommand && wsCommand.readyState === WebSocket.OPEN) {
+    wsCommand.send(JSON.stringify({
       type: 'command',
       command: command
     }));
@@ -670,9 +655,8 @@ function updateRefreshInterval() {
 
     // Set up new timer
     refreshTimer = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'get_status' }));
-        ws.send(JSON.stringify({ type: 'get_worlds' }));
+      if (wsWorlds && wsWorlds.readyState === WebSocket.OPEN) {
+        wsWorlds.send(JSON.stringify({ type: 'get_worlds' }));
       }
     }, refreshInterval);
   }
@@ -681,36 +665,6 @@ function updateRefreshInterval() {
 // Add event listener for the refresh interval input
 document.getElementById('refresh-interval').addEventListener('change', updateRefreshInterval);
 document.getElementById('refresh-interval').addEventListener('input', updateRefreshInterval);
-
-// Move the message handling logic to a separate function
-function handleMessage(data) {
-  switch (data.type) {
-    case 'container_output':
-      appendOutput(data.output);
-      break;
-    case 'command_response':
-      if (data.command === 'friendRequests') {
-        updateFriendRequests(data.output);
-      }
-      console.log('command_response', data.output);
-      break;
-    case 'status_update':
-      updateStatus(data.status);
-      break;
-    case 'worlds_update':
-      updateWorlds(data.output);
-      break;
-    case 'error':
-      console.log('error', data.message);
-      appendOutput(`Error: ${data.message}`, 'error');
-      break;
-    case 'bans_update':
-      updateBannedUsers(data.bans);
-      break;
-    default:
-      console.warn('Unknown message type:', data.type);
-  }
-}
 
 function updateLineNumbers() {
   const editor = document.getElementById('config-editor');
@@ -875,19 +829,8 @@ function updateConnectedUsers(worldCard, forceRefresh = false) {
 
 // Add function to refresh users list
 function refreshUsersList() {
-  const connectedUsersPanel = document.getElementById('connected-users');
-  if (connectedUsersPanel.style.display === 'block') {
-    // Get the currently selected world card
-    const worldsList = document.getElementById('worlds-list');
-    const selectedWorld = worldsList.querySelector('.world-card.selected');
-    if (selectedWorld) {
-      // First send the get_worlds request to update the data
-      ws.send(JSON.stringify({ type: 'get_worlds' }));
-      // After a short delay, update the users panel
-      setTimeout(() => {
-        updateConnectedUsers(selectedWorld, true);
-      }, 1000);
-    }
+  if (wsWorlds && wsWorlds.readyState === WebSocket.OPEN) {
+    wsWorlds.send(JSON.stringify({ type: 'get_worlds' }));
   }
 }
 
@@ -990,7 +933,7 @@ async function saveWorldProperties() {
   };
 
   // First focus the world
-  ws.send(JSON.stringify({
+  wsCommand.send(JSON.stringify({
     type: 'command',
     command: `focus ${worldIndex}`
   }));
@@ -1024,7 +967,7 @@ async function saveWorldProperties() {
 
   // Execute each command sequentially
   for (const command of commands) {
-    ws.send(JSON.stringify({
+    wsCommand.send(JSON.stringify({
       type: 'command',
       command: command
     }));
@@ -1035,7 +978,7 @@ async function saveWorldProperties() {
   // If any changes were made, save the config and reload
   if (commands.length > 0) {
     // Save the world configuration
-    ws.send(JSON.stringify({
+    wsCommand.send(JSON.stringify({
       type: 'command',
       command: 'saveConfig'
     }));
@@ -1047,7 +990,7 @@ async function saveWorldProperties() {
     loadConfig();
 
     // Refresh the worlds list
-    ws.send(JSON.stringify({ type: 'get_worlds' }));
+    wsWorlds.send(JSON.stringify({ type: 'get_worlds' }));
   }
 
   // Close the properties editor
@@ -1110,7 +1053,7 @@ async function handleFriendRequest(action, username) {
   // Update the command format for accepting friend requests
   const command = action === 'accept' ? `acceptFriendRequest ${username}` : `denyFriend ${username}`;
 
-  ws.send(JSON.stringify({
+  wsCommand.send(JSON.stringify({
     type: 'command',
     command: command
   }));
@@ -1123,8 +1066,8 @@ async function handleFriendRequest(action, username) {
 
   // Refresh friend requests after action
   setTimeout(() => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
+    if (wsCommand.readyState === WebSocket.OPEN) {
+      wsCommand.send(JSON.stringify({
         type: 'command',
         command: 'friendRequests'
       }));
@@ -1147,8 +1090,8 @@ function updateFriendRequestsInterval() {
 
     // Set up new timer
     friendRequestsTimer = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
+      if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
+        wsCommand.send(JSON.stringify({
           type: 'command',
           command: 'friendRequests'
         }));
@@ -1187,14 +1130,14 @@ async function sendWorldCommand(command) {
   }
 
   // Send the command through the websocket
-  ws.send(JSON.stringify({
+  wsCommand.send(JSON.stringify({
     type: 'command',
     command: actualCommand
   }));
 
   // After a short delay, refresh the worlds list
   setTimeout(() => {
-    ws.send(JSON.stringify({ type: 'get_worlds' }));
+    wsWorlds.send(JSON.stringify({ type: 'get_worlds' }));
   }, 1000);
 }
 
@@ -1250,7 +1193,7 @@ function clearDeniedFriendRequests() {
     deniedFriendRequests.clear();
     localStorage.removeItem('deniedFriendRequests');
     // Refresh the requests list
-    ws.send(JSON.stringify({
+    wsCommand.send(JSON.stringify({
       type: 'command',
       command: 'friendRequests'
     }));
@@ -1284,14 +1227,14 @@ function updateBannedUsers(bans) {
 // Add this function to handle unbanning users
 function unbanUser(username) {
   if (confirm(`Are you sure you want to unban ${username}?`)) {
-    ws.send(JSON.stringify({
+    wsCommand.send(JSON.stringify({
       type: 'command',
       command: `unbanByName ${username}`
     }));
 
     // Refresh the bans list after a short delay
     setTimeout(() => {
-      ws.send(JSON.stringify({
+      wsCommand.send(JSON.stringify({
         type: 'command',
         command: 'listbans'
       }));
@@ -1310,7 +1253,7 @@ function banUser() {
   }
 
   if (confirm(`Are you sure you want to ban ${username}?`)) {
-    ws.send(JSON.stringify({
+    wsCommand.send(JSON.stringify({
       type: 'command',
       command: `banByName ${username}`
     }));
@@ -1320,7 +1263,7 @@ function banUser() {
 
     // Refresh the bans list after a short delay
     setTimeout(() => {
-      ws.send(JSON.stringify({
+      wsCommand.send(JSON.stringify({
         type: 'command',
         command: 'listbans'
       }));
@@ -1340,75 +1283,78 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Add this function after the existing functions
 async function handleUserAction(action, username, worldIndex) {
+  if (!wsCommand || wsCommand.readyState !== WebSocket.OPEN) return;
+
   // First focus the correct world
   if (action !== 'ban') { // Ban doesn't require focusing
-    ws.send(JSON.stringify({
+    wsCommand.send(JSON.stringify({
       type: 'command',
       command: `focus ${worldIndex}`
     }));
 
     // Wait a moment for the focus command to complete
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
+    setTimeout(() => {
+      const command = getActionCommand(action, username);
+      if (command) {
+        wsCommand.send(JSON.stringify({
+          type: 'command',
+          command: command
+        }));
 
-  // Execute the appropriate command
-  let command;
+        // Refresh the worlds list after a short delay
+        setTimeout(() => {
+          if (wsWorlds && wsWorlds.readyState === WebSocket.OPEN) {
+            wsWorlds.send(JSON.stringify({ type: 'get_worlds' }));
+          }
+        }, 1000);
+      }
+    }, 500);
+  } else {
+    // Handle ban action directly
+    wsCommand.send(JSON.stringify({
+      type: 'command',
+      command: `banByName ${username}`
+    }));
+  }
+}
+
+// Helper function for handleUserAction
+function getActionCommand(action, username) {
   switch (action) {
-    case 'kick':
-      command = `kick ${username}`;
-      break;
-    case 'respawn':
-      command = `respawn ${username}`;
-      break;
-    case 'silence':
-      command = `silence ${username}`;
-      break;
-    case 'unsilence':
-      command = `unsilence ${username}`;
-      break;
-    case 'ban':
-      command = `banByName ${username}`;
-      break;
-    default:
-      console.error('Unknown action:', action);
-      return;
+    case 'kick': return `kick ${username}`;
+    case 'respawn': return `respawn ${username}`;
+    case 'silence': return `silence ${username}`;
+    case 'unsilence': return `unsilence ${username}`;
+    default: return null;
   }
-
-  // Send the command
-  ws.send(JSON.stringify({
-    type: 'command',
-    command: command
-  }));
-
-  // Refresh the worlds list after a short delay
-  setTimeout(() => {
-    ws.send(JSON.stringify({ type: 'get_worlds' }));
-  }, 1000);
 }
 
 // Add this new function after handleUserAction
 async function handleRoleChange(event, username, worldIndex) {
   const newRole = event.target.value;
 
-  // First focus the world
-  ws.send(JSON.stringify({
-    type: 'command',
-    command: `focus ${worldIndex}`
-  }));
+  if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
+    // First focus the world
+    wsCommand.send(JSON.stringify({
+      type: 'command',
+      command: `focus ${worldIndex}`
+    }));
 
-  // Wait a moment for the focus command to complete
-  await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait a moment for the focus command to complete
+    setTimeout(() => {
+      wsCommand.send(JSON.stringify({
+        type: 'command',
+        command: `role ${username} ${newRole}`
+      }));
 
-  // Send the role command
-  ws.send(JSON.stringify({
-    type: 'command',
-    command: `role ${username} ${newRole}`
-  }));
-
-  // Refresh the worlds list after a short delay
-  setTimeout(() => {
-    ws.send(JSON.stringify({ type: 'get_worlds' }));
-  }, 1000);
+      // Refresh the worlds list after a short delay
+      setTimeout(() => {
+        if (wsWorlds && wsWorlds.readyState === WebSocket.OPEN) {
+          wsWorlds.send(JSON.stringify({ type: 'get_worlds' }));
+        }
+      }, 1000);
+    }, 500);
+  }
 }
 
 // Add this function after the saveWorldProperties function
