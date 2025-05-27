@@ -9,8 +9,10 @@ The application provides multiple WebSocket endpoints:
 
 - `ws://your-server-ip:8000/ws/command` - For sending commands to the server
 - `ws://your-server-ip:8000/ws/worlds` - For worlds monitoring
-- `ws://your-server-ip:8000/ws/status` - For status monitoring
-- `ws://your-server-ip:8000/ws/logs` - For container logs monitoring
+- `ws://your-server-ip:8000/ws/logs` - For container logs streaming
+- `ws://your-server-ip:8000/ws/cpu` - For CPU usage monitoring
+- `ws://your-server-ip:8000/ws/memory` - For memory usage monitoring
+- `ws://your-server-ip:8000/ws/container_status` - For container status monitoring
 - `ws://your-server-ip:8000/ws/heartbeat` - Heartbeat connection to keep other WebSockets alive
 
 ## Message Format
@@ -45,17 +47,17 @@ Special commands:
 - `friendRequests` - Returns a list of pending friend requests
 - `worlds` - Returns information about all running worlds
 
-### 2. Status Request
+### 2. Container Status Request
 
-Get container status and system metrics:
+Get container status:
 
 ```json
 {
-  "type": "get_status"
+  "type": "get_container_status"
 }
 ```
 
-Returns CPU usage, memory usage, and container status information.
+Returns container status information.
 
 ### 3. Worlds Request
 
@@ -67,15 +69,20 @@ Get information about all running worlds:
 }
 ```
 
-### 4. Logs Request
+## Resource Monitoring
 
-Get container logs:
+### 1. CPU Usage
 
-```json
-{
-  "type": "get_logs"
-}
-```
+The CPU endpoint automatically streams CPU usage updates every second. No request message needed.
+
+### 2. Memory Usage
+
+The memory endpoint automatically streams memory usage updates every second. No request message needed.
+
+### 3. Container Logs
+
+The logs endpoint automatically streams log updates in real-time. Upon connection, it sends the last 20 log lines  
+and then streams new logs as they occur.
 
 ## Response Formats
 
@@ -107,19 +114,39 @@ Response to `listbans` command:
 }
 ```
 
-### 3. Status Update
+### 3. CPU Update
 
-Response to status request:
+Automatic updates from the CPU endpoint:
 
 ```json
 {
-  "type": "status_update",
+  "type": "cpu_update",
+  "cpu_usage": 5.2
+}
+```
+
+### 4. Memory Update
+
+Automatic updates from the memory endpoint:
+
+```json
+{
+  "type": "memory_update",
+  "memory_percent": 45.3,
+  "memory_used": "4.2GB",
+  "memory_total": "16.0GB"
+}
+```
+
+### 5. Container Status Update
+
+Response to container status request:
+
+```json
+{
+  "type": "container_status_update",
   "status": {
     "status": "running",
-    "cpu_usage": "5.2",
-    "memory_percent": "45.3",
-    "memory_used": "4.2GB",
-    "memory_total": "16.0GB",
     "name": "container_name",
     "id": "container_id",
     "image": "container_image"
@@ -127,7 +154,7 @@ Response to status request:
 }
 ```
 
-### 4. Worlds Update
+### 6. Worlds Update
 
 Response to worlds request:
 
@@ -162,20 +189,9 @@ Response to worlds request:
 }
 ```
 
-### 5. Logs Update
+### 7. Container Output
 
-Response to logs request:
-
-```json
-{
-  "type": "logs_update",
-  "output": "container logs content"
-}
-```
-
-### 6. Container Output
-
-Real-time container output messages:
+Real-time container log messages:
 
 ```json
 {
@@ -185,7 +201,7 @@ Real-time container output messages:
 }
 ```
 
-### 7. Error Response
+### 8. Error Response
 
 When an error occurs:
 
@@ -205,10 +221,19 @@ The application also provides REST endpoints:
 - `GET /config` - Get the current headless server configuration
 - `POST /config` - Update the headless server configuration
 
+### 2. Container Control
+
+- `POST /api/start-container` - Start the container
+- `POST /api/stop-container` - Stop the container
+- `POST /api/restart-container` - Restart the container
+
 ## Additional Features
 
-- Real-time monitoring of container status, resource usage, and logs
+- Real-time streaming of CPU usage, memory usage, and container logs
+- Separate endpoints for different monitoring concerns
 - Automatic reconnection handling
 - Connection state management
 - CORS support for web interface integration
 - Heartbeat mechanism to keep connections alive
+- Initial log history on connection (last 20 lines)
+- Request-based container status updates to reduce API load
