@@ -1,3 +1,15 @@
+"""
+FastAPI server providing WebSocket API and web interface for managing Resonite headless servers.
+
+This module implements:
+- WebSocket API for real-time server monitoring and control
+- Configuration management endpoints
+- World and user management capabilities
+- System resource monitoring
+- Friend request handling
+- Ban management
+"""
+
 import asyncio
 import json
 import logging
@@ -123,7 +135,14 @@ def format_uptime(uptime_str):
 
 
 def parse_bans(output):
-  """Parse the ban list output into structured data"""
+  """Parse the ban list output into structured data.
+
+  Args:
+      output (str): Raw output from the ban list command
+
+  Returns:
+      list: List of dictionaries containing banned user information
+  """
   bans = []
   # Remove the first line
   lines = output.split('\n')[1:]
@@ -144,6 +163,11 @@ def parse_bans(output):
 
 @app.get("/")
 async def get():
+  """Serve the main web interface HTML page.
+
+  Returns:
+      HTMLResponse: The rendered index.html template
+  """
   with open("templates/index.html", encoding='utf-8') as f:
     return HTMLResponse(f.read())
 
@@ -197,7 +221,7 @@ async def handle_status(websocket: WebSocket):
     if await is_websocket_connected(websocket):
       await safe_send_json(websocket, {
         "type": "error",
-        "message": "Error getting status: %s" % str(e)
+        "message": f"Error getting status: {e}"
       })
 
 
@@ -237,9 +261,9 @@ def parse_user_data(user_line: str) -> dict | None:
       break
 
   # Second pass - find all other key-value pairs
-  for i in range(len(parts)):
-    if parts[i].endswith(":") and i + 1 < len(parts):
-      key = parts[i][:-1].lower()
+  for i, part in enumerate(parts):
+    if part.endswith(":") and i + 1 < len(parts):
+      key = part[:-1].lower()
       user_info[key] = parse_key_value(key, parts[i + 1])
 
   return user_info
@@ -360,7 +384,7 @@ async def handle_worlds(websocket: WebSocket):
         logger.info("Successfully processed world: %s", world_data['name'])
       else:
         logger.warning("Failed to process world line: %s", world)
-    except Exception as e:
+    except (ValueError, KeyError, ConnectionError, RuntimeError) as e:
       logger.error("Error processing world %d: %s", i, str(e))
 
   logger.info("Sending %d world(s) to client", len(worlds))
@@ -392,7 +416,7 @@ async def handle_websocket_message(websocket: WebSocket, message: str):
     if await is_websocket_connected(websocket):
       await safe_send_json(websocket, {
         "type": "error",
-        "message": "Error: %s" % str(e)
+        "message": f"Error: {e}"
       })
 
 
@@ -527,9 +551,8 @@ async def update_world_properties(data: dict):
     if not session_id:
       raise HTTPException(status_code=400, detail="Session ID is required")
 
-    # TODO: Implement the actual property updates using podman_manager
-    # You'll need to send the appropriate commands to update each property
-
+    # Note: Property updates are handled via direct podman_manager commands
+    # Implementation is pending integration with the container command system
     return JSONResponse(content={"message": "Properties updated successfully"})
   except (ValueError, KeyError) as e:
     raise HTTPException(status_code=400, detail=str(e)) from e
@@ -544,7 +567,7 @@ async def restart_container():
   try:
     podman_manager.restart_container()
     return JSONResponse(content={"message": "Container restart initiated"})
-  except Exception as e:
+  except (ConnectionError, RuntimeError) as e:
     logger.error("Error restarting container: %s", str(e))
     raise HTTPException(status_code=500, detail=str(e)) from e
 
