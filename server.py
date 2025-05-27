@@ -186,6 +186,14 @@ async def handle_command(websocket: WebSocket, command: str):
     logger.info("Executing command: %s", command)
     output = podman_manager.send_command(command)
 
+    # Check if the output indicates container is not running
+    if output.startswith("Error: Container is not running"):
+      await safe_send_json(websocket, {
+        "type": "error",
+        "message": "Container is not running. Please start the container first."
+      })
+      return
+
     if command == "listbans":
       bans = parse_bans(output)
       await safe_send_json(websocket, {
@@ -205,15 +213,16 @@ async def handle_status(websocket: WebSocket):
   async with request_locks['status']:
     try:
       status = podman_manager.get_container_status()
-      status_dict = dict(status)  # Convert to dictionary if it's not already
+      status_dict = dict(status)
 
+      # If container is not running, we still want to show system metrics
+      # but indicate the container state clearly
       cpu_percent = psutil.cpu_percent(interval=1)
       memory = psutil.virtual_memory()
       memory_percent = memory.percent
       memory_used = f"{memory.used / (1024 * 1024 * 1024):.1f}GB"
       memory_total = f"{memory.total / (1024 * 1024 * 1024):.1f}GB"
 
-      # Create a new dictionary with all status data
       full_status = {
         **status_dict,
         "cpu_usage": cpu_percent,
@@ -222,13 +231,16 @@ async def handle_status(websocket: WebSocket):
         "memory_total": memory_total
       }
 
+      if status_dict.get('error'):
+        full_status['status'] = 'stopped'
+        full_status['error_message'] = status_dict['error']
+
       await safe_send_json(websocket, {
         "type": "status_update",
         "status": full_status
       })
     except (ConnectionError, RuntimeError) as e:
       logger.error("Error in handle_status: %s", str(e))
-      # Only try to send error if connection is still valid
       if await is_websocket_connected(websocket):
         await safe_send_json(websocket, {
           "type": "error",
@@ -375,6 +387,15 @@ async def get_world_data(world_line: str, index: int) -> dict | None:
 async def handle_worlds(websocket: WebSocket):
   """Handle worlds request and data collection"""
   async with request_locks['worlds']:
+    # First check if container is running
+    if not podman_manager.is_container_running():
+      await safe_send_json(websocket, {
+        "type": "worlds_update",
+        "output": [],
+        "error": "Container is not running. Please start the container first."
+      })
+      return
+
     worlds_output = podman_manager.send_command("worlds")
     worlds_output_lines = worlds_output.split('\n')
 
@@ -412,14 +433,13 @@ async def handle_websocket_message(websocket: WebSocket, message: str):
     data = json.loads(message)
     message_type = data.get("type", "")
 
-    if message_type in request_locks:
-      if request_locks[message_type].locked():
-        logger.warning("Request of type %s already in progress, skipping", message_type)
-        await safe_send_json(websocket, {
-          "type": "error",
-          "message": f"A {message_type} request is already in progress"
-        })
-        return
+    if message_type in request_locks and request_locks[message_type].locked():
+      logger.warning("Request of type %s already in progress, skipping", message_type)
+      await safe_send_json(websocket, {
+        "type": "error",
+        "message": f"A {message_type} request is already in progress"
+      })
+      return
 
     if data["type"] == "command":
       await handle_command(websocket, data["command"])

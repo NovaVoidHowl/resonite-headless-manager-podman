@@ -1,153 +1,167 @@
-import time
-import re
-from collections import deque
-from threading import Lock
 import logging
-import threading
-import podman
 import os
+import re
 import subprocess
 import tempfile
+import threading
+import time
+from collections import deque
+from threading import Lock
+from typing import Any, Dict, List, Optional
+
+import podman
+from podman import errors as podman_errors
+from podman.domain.containers import Container
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Constants
+ERROR_CLIENT_NOT_INITIALIZED = "Podman client not initialized"
+ERROR_CONTAINER_NOT_RUNNING = "Container is not running"
+
 
 class PodmanManager:
-  def __init__(self, container_name):
+  def __init__(self, container_name: str):
     self.container_name = container_name
-    self.output_buffer = deque(maxlen=25)  # Rolling buffer of last 25 lines
-    self.buffer_lock = Lock()  # Thread-safe access to buffer
-    # Regex pattern for ANSI escape sequences
+    self.output_buffer: deque = deque(maxlen=25)
+    self.buffer_lock: Lock = Lock()
     self.ansi_escape = re.compile(r'(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]|\x1B[()][AB012]')
-    self._monitor_running = False
-    self.client = None
-
-    # Initialize podman client
+    self._monitor_running: bool = False
+    self.client: Optional[podman.PodmanClient] = None
     self._init_client()
 
-  def _init_client(self):
+  def _init_client(self) -> None:
     """Initialize the podman client"""
     connection_error = None
-
-    # URI schemes according to Podman Python API docs
     connection_methods = [
       {"uri": "http+unix:///run/podman/podman.sock", "desc": "Unix socket"},
       {"uri": "http+unix:///run/user/0/podman/podman.sock", "desc": "User Unix socket"},
       {"uri": "tcp://localhost:8888", "desc": "TCP localhost:8888"},
     ]
 
-    # Try each connection method
     for method in connection_methods:
       try:
         logger.info("Trying to connect using %s", method['desc'])
-        logger.info("Creating PodmanClient with base_url: %s", method['uri'])
-
-        self.client = podman.PodmanClient(base_url=method["uri"])
-
-        # Test connection with ping and get container
-        logger.info("Testing connection to %s", method['uri'])
-        self.client.ping()
-        logger.info("Ping successful, trying to get container: %s", self.container_name)
-
-        # Check if container exists and is accessible
-        container = self.client.containers.get(self.container_name)
+        client = podman.PodmanClient(base_url=method["uri"])
+        client.ping()
+        container = client.containers.get(self.container_name)
         logger.info("Container found: %s (ID: %s)", container.name, container.id)
-        logger.info("Container status: %s", container.status)
-
-        # If we got here, connection is successful
-        logger.info("Successfully connected to container '%s' using %s", self.container_name, method['desc'])
+        self.client = client
         return
-      except Exception as e:
+      except (ConnectionError, RuntimeError) as e:
         connection_error = e
         logger.warning("Connection failed with %s: %s", method['desc'], str(e))
 
-    # If we get here, all connection attempts failed
     logger.critical("All connection attempts failed. Last error: %s", str(connection_error))
+    self.client = None
 
-    # Set a default client so the app doesn't crash completely
-    self.client = podman.PodmanClient(base_url="http+unix:///run/podman/podman.sock")
-
-  def clean_output(self, text):
+  def clean_output(self, text: str) -> List[str]:
     """Clean and format output text by removing ANSI sequences and handling line breaks"""
-    # Remove all ANSI escape sequences
     clean_text = self.ansi_escape.sub('', text)
-
-    # Split on both \r\n and \n, and filter out empty lines
     lines = [line.strip() for line in clean_text.replace('\r\n', '\n').split('\n')]
-    return [line for line in lines if line]  # Return only non-empty lines
+    return [line for line in lines if line]
 
-  def add_to_buffer(self, text):
+  def add_to_buffer(self, text: str) -> None:
     with self.buffer_lock:
       clean_lines = self.clean_output(text)
       for line in clean_lines:
         self.output_buffer.append(line)
 
-  def get_recent_lines(self, count=50):
+  def get_recent_lines(self, count: int = 50) -> List[str]:
     with self.buffer_lock:
       return list(self.output_buffer)[-count:]
 
-  def send_command(self, command, timeout=10):
-    """
-    Send a command to the container's console using Python's subprocess
-    with a properly constructed expect-like interaction
-    """
+  def is_container_running(self) -> bool:
+    """Check if the container is currently running."""
+    try:
+      if not self.client:
+        return False
+      container = self.client.containers.get(self.container_name)
+      return container.status == 'running'
+    except (ConnectionError, RuntimeError) as e:
+      logger.error("Error checking container status: %s", str(e))
+      return False
+
+  def _execute_command_process(self, command: str, output_path: str) -> subprocess.Popen:
+    """Execute the podman attach process and send command."""
+    attach_cmd = [
+      "script", "-q", output_path, "-c",
+      f"podman attach --detach-keys='ctrl-d' {self.container_name}"
+    ]
+
+    logger.info("Starting podman attach process with command: %s", ' '.join(attach_cmd))
+    process = subprocess.Popen(
+      attach_cmd,
+      stdin=subprocess.PIPE,
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      text=True
+    )
+
+    time.sleep(1)
+    if process.stdin:
+      process.stdin.write(f"{command}\n")
+      process.stdin.flush()
+      time.sleep(2)
+      process.stdin.write("\x04")
+      process.stdin.flush()
+
+    return process
+
+  def _process_command_output(self, output: str, command: str) -> str:
+    """Process and parse command output."""
+    clean_lines = self.clean_output(output)
+    logger.info("Captured %d lines of output", len(clean_lines))
+
+    response_lines = []
+    capture_started = False
+
+    for line in clean_lines:
+      if not capture_started and command.strip() in line:
+        capture_started = True
+      elif capture_started and '>' in line:
+        break
+      elif capture_started:
+        response_lines.append(line)
+
+    if response_lines:
+      logger.info("Found %d response lines", len(response_lines))
+      return '\n'.join(response_lines)
+
+    logger.warning("No response lines found")
+    return ""
+
+  def send_command(self, command: str, timeout: int = 10) -> str:
+    """Send a command to the container's console."""
     logger.info("Sending command to container: %s", command)
 
     try:
-      # Verify the container exists and is running
+      if not self.is_container_running():
+        logger.error("Container is not running, cannot send command: %s", command)
+        return f"Error: {ERROR_CONTAINER_NOT_RUNNING}"
+
+      if not self.client:
+        logger.error(ERROR_CLIENT_NOT_INITIALIZED)
+        return f"Error: {ERROR_CLIENT_NOT_INITIALIZED}"
+
       container = self.client.containers.get(self.container_name)
       logger.info("Container verified: %s", container.name)
 
-      # Create a temporary file to store the command
-      with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as cmd_file:
+      with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', delete=False, suffix='.txt') as cmd_file:
         cmd_path = cmd_file.name
         cmd_file.write(command)
 
-      # Create a temporary file to store the output
       output_path = os.path.join(os.path.dirname(cmd_path), f"output_{os.getpid()}.txt")
 
       try:
-        # Execute podman attach in a separate process that we can control
-        # We use 'script' to capture the full terminal output including control sequences
-        attach_cmd = [
-          "script", "-q", output_path, "-c",
-          f"podman attach --detach-keys='ctrl-d' {self.container_name}"
-        ]
+        process = self._execute_command_process(command, output_path)
 
-        logger.info(f"Starting podman attach process with command: {' '.join(attach_cmd)}")
-
-        # Start the process
-        process = subprocess.Popen(
-          attach_cmd,
-          stdin=subprocess.PIPE,
-          stdout=subprocess.PIPE,
-          stderr=subprocess.PIPE,
-          text=True
-        )
-
-        # Wait a moment for the container console to initialize
-        time.sleep(1)
-
-        # Send the command followed by a newline
-        logger.info(f"Sending command to container console: {command}")
-        process.stdin.write(f"{command}\n")
-        process.stdin.flush()
-
-        # Wait for command to be processed
-        time.sleep(2)
-
-        # Send Ctrl+D (ASCII value 4) to detach
-        logger.info("Sending Ctrl+D to detach from console")
-        process.stdin.write("\x04")
-        process.stdin.flush()
-
-        # Wait for the process to complete
         try:
           process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
-          logger.warning(f"Process timed out after {timeout} seconds, sending SIGTERM")
+          logger.warning("Process timed out after %d seconds, sending SIGTERM", timeout)
           process.terminate()
           try:
             process.wait(timeout=2)
@@ -155,109 +169,86 @@ class PodmanManager:
             logger.warning("Termination timed out, sending SIGKILL")
             process.kill()
 
-        # Read the output file
-        logger.info(f"Reading output from {output_path}")
-        with open(output_path, 'r') as output_file:
+        with open(output_path, 'r', encoding='utf-8') as output_file:
           output = output_file.read()
-
-        # Process and parse the output
-        clean_lines = self.clean_output(output)
-        logger.info(f"Captured {len(clean_lines)} lines of output")
-
-        # Extract the command response
-        response_lines = []
-        capture_started = False
-
-        for line in clean_lines:
-          # Skip lines until we find our command
-          if not capture_started:
-            if command.strip() in line:
-              capture_started = True
-              continue
-          # If we've started capturing and hit a prompt, stop
-          elif '>' in line:
-            break
-          # Otherwise add the line to our response
-          elif capture_started:
-            response_lines.append(line)
-
-        if response_lines:
-          logger.info(f"Found {len(response_lines)} response lines")
-          response = '\n'.join(response_lines)
-        else:
-          logger.warning("No response lines found")
-          response = ""
-
-        return response
+          return self._process_command_output(output, command)
 
       finally:
-        # Clean up temporary files
-        try:
-          if os.path.exists(cmd_path):
-            os.unlink(cmd_path)
-          if os.path.exists(output_path):
-            os.unlink(output_path)
-        except Exception as e:
-          logger.warning(f"Error cleaning up temporary files: {e}")
+        for path in [cmd_path, output_path]:
+          try:
+            if os.path.exists(path):
+              os.unlink(path)
+          except OSError as e:
+            logger.warning("Error cleaning up temporary file %s: %s", path, str(e))
 
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
       error_msg = str(e).strip() or "Unknown error"
-      logger.error(f"Error sending command to container: {error_msg}")
+      logger.error("Error sending command to container: %s", error_msg)
       return f"Error: {error_msg}"
 
-  def monitor_output(self, callback):
-    """Monitor container output continuously using the Podman Python API logs method"""
+  def _process_logs(self, container: Container, callback) -> None:
+    """Process container logs."""
+    try:
+      for log_line in container.logs(
+        stdout=True,
+        stderr=True,
+        follow=True,
+        stream=True,
+        since=0
+      ):
+        if not self._monitor_running or not self.is_container_running():
+          if not self.is_container_running():
+            callback("Container stopped\n")
+          break
+
+        decoded_line = log_line.decode('utf-8').strip() if isinstance(log_line, bytes) else str(log_line).strip()
+        if decoded_line:
+          self.add_to_buffer(decoded_line)
+          callback(decoded_line + '\n')
+    except (ConnectionError, RuntimeError) as e:
+      logger.error("Error in log monitoring: %s", str(e))
+
+  def monitor_output(self, callback) -> None:
+    """Monitor container output continuously."""
     self._monitor_running = True
     logger.info("Starting container log monitoring")
 
     try:
+      if not self.is_container_running():
+        logger.error("Cannot monitor output: %s", ERROR_CONTAINER_NOT_RUNNING)
+        callback(f"Error: {ERROR_CONTAINER_NOT_RUNNING}\n")
+        return
+
+      if not self.client:
+        logger.error(ERROR_CLIENT_NOT_INITIALIZED)
+        return
+
       container = self.client.containers.get(self.container_name)
-
-      # Define a function to handle log processing in a separate thread
-      def process_logs():
-        try:
-          # Use the logs method with follow=True to stream logs continuously
-          for log_line in container.logs(
-            stdout=True,
-            stderr=True,
-            follow=True,
-            stream=True,
-            since=0  # Get all logs from the start
-          ):
-            if not self._monitor_running:
-              break
-
-            if isinstance(log_line, bytes):
-              decoded_line = log_line.decode('utf-8').strip()
-            else:
-              decoded_line = str(log_line).strip()
-
-            if decoded_line:
-              self.add_to_buffer(decoded_line)
-              callback(decoded_line + '\n')
-        except Exception as log_error:
-          logger.error("Error in log monitoring: %s", str(log_error))
-
-      # Start log processing in a separate thread
-      log_thread = threading.Thread(target=process_logs, daemon=True)
+      log_thread = threading.Thread(
+        target=self._process_logs,
+        args=(container, callback),
+        daemon=True
+      )
       log_thread.start()
 
-      # Wait for the monitoring to be stopped
       while self._monitor_running and log_thread.is_alive():
         time.sleep(0.5)
+        if not self.is_container_running():
+          self._monitor_running = False
 
       logger.info("Log monitoring stopped")
 
-    except Exception as e:
+    except (ConnectionError, RuntimeError) as e:
       logger.error("Failed to start log monitoring: %s", str(e))
       self._monitor_running = False
 
-  def get_container_status(self):
-    """Get container status information"""
+  def get_container_status(self) -> Dict[str, Any]:
+    """Get container status information."""
     try:
-      container = self.client.containers.get(self.container_name)
+      if not self.client:
+        return {'error': ERROR_CLIENT_NOT_INITIALIZED, 'status': 'unknown'}
 
-      # Get detailed inspection data
+      container = self.client.containers.get(self.container_name)
       inspect_data = container.inspect()
 
       return {
@@ -266,38 +257,35 @@ class PodmanManager:
         'id': container.id,
         'image': inspect_data.get('ImageName', container.image)
       }
-    except Exception as e:
+    except (ConnectionError, RuntimeError, podman_errors.ContainerNotFound) as e:
       logger.error("Error getting container status: %s", str(e))
       return {'error': str(e), 'status': 'unknown'}
 
-  def restart_container(self):
-    """Safely restart the Podman container"""
+  def restart_container(self) -> bool:
+    """Safely restart the Podman container."""
     try:
-      container = self.client.containers.get(self.container_name)
+      if not self.client:
+        raise RuntimeError(ERROR_CLIENT_NOT_INITIALIZED)
 
-      # Stop monitoring if it's running
+      container = self.client.containers.get(self.container_name)
       self._monitor_running = False
 
-      # Use the container's restart method with timeout
       logger.info("Restarting container: %s", self.container_name)
       container.restart(timeout=30)
 
-      # Wait for container to be running again
       retries = 0
       max_retries = 10
       while retries < max_retries:
         container.reload()
         if container.status == 'running':
           logger.info("Container successfully restarted")
-          break
+          return True
         time.sleep(1)
         retries += 1
 
-      if retries >= max_retries:
-        logger.warning("Container restart took longer than expected")
+      logger.warning("Container restart took longer than expected")
+      return False
 
-      return True
-
-    except Exception as e:
+    except (ConnectionError, RuntimeError, podman_errors.ContainerNotFound) as e:
       logger.error("Failed to restart container: %s", str(e))
-      raise Exception(f"Failed to restart container: {str(e)}")
+      raise RuntimeError(f"Failed to restart container: {str(e)}") from e
