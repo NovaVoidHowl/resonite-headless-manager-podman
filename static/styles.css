@@ -44,6 +44,7 @@ body {
   align-items: center;
   gap: 10px;
   width: calc(100% - 30px);
+  flex-wrap: wrap;
 }
 
 .command-line {
@@ -78,7 +79,6 @@ body {
   transition: transform 0.2s, box-shadow 0.2s;
   min-width: 400px;
   cursor: pointer;
-  transition: background-color 0.2s;
 }
 
 .world-card:hover {
@@ -99,6 +99,7 @@ body {
   padding-bottom: 5px;
   border-bottom: 1px solid #4a4a4a;
   margin-bottom: 5px;
+  font-family: 'Roboto', sans-serif;
 }
 
 .world-stat {
@@ -118,10 +119,6 @@ body {
   font-family: monospace;
 }
 
-.world-card .world-name {
-  font-weight: bold;
-  color: #4CAF50;
-}
 
 .worlds-header {
   color: #ffffff;
@@ -244,11 +241,6 @@ button:active {
   border-top: 1px solid #3a3a3a;
 }
 
-.user-list .label {
-  display: block;
-  margin-bottom: 5px;
-}
-
 .user-list .users {
   display: flex;
   flex-direction: column;
@@ -289,6 +281,7 @@ button:active {
   color: #4CAF50;
   cursor: pointer;
   transition: all 0.2s;
+  font-size: 0.9em;
 }
 
 .toggle-console:hover {
@@ -316,6 +309,7 @@ button:active {
   padding: 10px;
   overflow-y: auto;
   margin-bottom: 10px;
+  flex: 1;
 }
 
 .console-section #command-input {
@@ -326,6 +320,8 @@ button:active {
   color: #ffffff;
   font-family: monospace;
   border-radius: 4px;
+  flex: 1;
+  margin: 0;
 }
 
 .session-id-container {
@@ -383,7 +379,6 @@ button:active {
   height: 400px;
   background-color: #1e1e1e;
   color: #ffffff;
-  font-family: monospace;
   padding: 10px;
   border: 1px solid #3a3a3a;
   border-radius: 4px;
@@ -391,6 +386,11 @@ button:active {
   white-space: pre;
   overflow-wrap: normal;
   overflow-x: auto;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 14px;
+  caret-color: #fff;
+  position: relative;
+  z-index: 1;
 }
 
 .config-actions {
@@ -424,29 +424,12 @@ button:active {
   margin: 20px 0;
 }
 
-.toggle-console {
-  /* Update toggle button styles */
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.toggle-console .icon {
-  display: inline-block;
-  transition: transform 0.2s;
-  transform: rotate(-90deg);
-  /* Point right by default */
-}
-
-.toggle-console.expanded .icon {
-  transform: rotate(-180deg);
-  /* Point up when expanded */
-}
 
 .layout-container {
   display: flex;
   gap: 20px;
   min-height: 100vh;
+  padding-bottom: 70px;
 }
 
 .main-content {
@@ -487,6 +470,8 @@ button:active {
   display: block;
   color: #888;
   margin-bottom: 5px;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 500;
 }
 
 .setting-input {
@@ -508,27 +493,14 @@ button:active {
   font-size: 0.9em;
   color: #666;
   margin-top: 5px;
-}
-
-/* Add these styles in the <style> section */
-.user-card {
-  background-color: #2a2a2a;
-  border-radius: 4px;
-  padding: 8px;
-  margin: 5px 0;
-  width: calc(100% - 16px);
-}
-
-.user-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 300;
 }
 
 .user-name {
   font-weight: bold;
   color: #ffffff;
+  font-family: 'Roboto', sans-serif;
 }
 
 .user-role {
@@ -572,12 +544,6 @@ button:active {
   color: #ff6b6b;
 }
 
-.user-list {
-  grid-column: 1 / -1;
-  margin-top: 10px;
-  padding: 10px;
-  border-top: 1px solid #3a3a3a;
-}
 
 .user-list .label {
   display: block;
@@ -613,36 +579,6 @@ button:active {
   font-size: 1.2em;
   font-weight: 500;
   font-family: 'Roboto', sans-serif;
-}
-
-button {
-  font-family: 'Roboto', sans-serif;
-  font-weight: 500;
-}
-
-#config-editor {
-  font-family: 'Roboto Mono', monospace;
-  font-size: 14px;
-}
-
-.world-card .world-name {
-  font-family: 'Roboto', sans-serif;
-  font-weight: 500;
-}
-
-.user-name {
-  font-family: 'Roboto', sans-serif;
-  font-weight: 500;
-}
-
-.setting-label {
-  font-family: 'Roboto', sans-serif;
-  font-weight: 500;
-}
-
-.setting-description {
-  font-family: 'Roboto', sans-serif;
-  font-weight: 300;
 }
 
 @media (max-width: 480px) {
@@ -700,20 +636,11 @@ button {
   padding-bottom: 50px;
 }
 
-.console-section #output {
-  flex: 1;
-  margin: 0;
-}
 
 .console-section .input-group {
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
-}
-
-.console-section #command-input {
-  flex: 1;
-  margin: 0;
 }
 
 /* Config section specific styles */
@@ -725,28 +652,6 @@ button {
   flex: 1;
   margin: 0;
   resize: none;
-}
-
-/* Update main content to account for footer */
-.layout-container {
-  padding-bottom: 70px;
-  /* Height of footer + some extra space */
-}
-
-/* Update toggle button styles */
-.toggle-console {
-  background: none;
-  border: 1px solid #4CAF50;
-  color: #4CAF50;
-  padding: 6px 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9em;
-}
-
-.toggle-console:hover {
-  background-color: #4CAF5022;
 }
 
 .toggle-console.expanded {
@@ -778,30 +683,10 @@ button {
   overflow-y: hidden;
   box-sizing: border-box;
   height: 100%;
-}
-
-/* Remove white-space: pre from line numbers */
-.line-numbers div {
-  padding-right: 8px;
-}
-
-#config-editor {
-  flex: 1;
-  margin: 0;
-  border: none;
-  border-radius: 0 4px 4px 0;
-  padding: 10px;
-  line-height: 1.5;
-  white-space: pre;
-  overflow-y: scroll;
-  overflow-x: auto;
-  resize: none;
   position: relative;
   z-index: 1;
-  background: transparent;
-  box-sizing: border-box;
-  height: 100%;
 }
+
 
 #config-editor-highlight {
   position: absolute;
@@ -813,33 +698,6 @@ button {
   background-color: #2d2d2d;
   pointer-events: none;
   z-index: 0;
-}
-
-#config-editor {
-  caret-color: #fff;
-  /* Makes cursor visible */
-}
-
-/* Style for the current line highlight */
-#config-editor-highlight {
-  position: absolute;
-  width: 100%;
-  background-color: #2d2d2d;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Ensure editor content stays above highlight */
-#config-editor {
-  position: relative;
-  z-index: 1;
-  background: transparent;
-}
-
-/* Update line numbers container to accommodate highlight */
-.line-numbers {
-  position: relative;
-  z-index: 1;
 }
 
 /* Add style for highlighted line number */
@@ -918,15 +776,6 @@ button {
   cursor: pointer;
   height: 0;
   width: 0;
-}
-
-/* Custom checkbox container */
-.setting-row {
-  position: relative;
-  padding: 8px 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 /* Create custom checkbox */
@@ -1068,10 +917,6 @@ button {
   transform: translateY(0);
 }
 
-.friend-requests-card {
-  margin-top: 16px;
-}
-
 .friend-requests-card .sidebar-header {
   display: flex;
   justify-content: space-between;
@@ -1148,11 +993,6 @@ button {
   /* Amber color for restart */
 }
 
-.save-button {
-  background-color: #4CAF50;
-  /* Green color for save */
-}
-
 .close-button {
   background-color: #f44336;
   /* Red color for close */
@@ -1190,13 +1030,6 @@ button {
   align-items: center;
   margin-bottom: 10px;
   width: 100%;
-}
-
-#status {
-  margin-bottom: 0;
-  /* Override previous margin */
-  width: auto;
-  /* Override previous width */
 }
 
 .server-controls {
@@ -1266,14 +1099,6 @@ button {
 .stat-value {
   color: #4CAF50;
   font-weight: 500;
-}
-
-/* Update the existing status styles to accommodate the new layout */
-#status {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
 }
 
 .status-text {
@@ -1466,15 +1291,6 @@ button {
   background-color: #1a1a1a;
   color: #ffffff;
   padding: 8px;
-}
-
-/* Update the user-header style to accommodate the dropdown */
-.user-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-  gap: 10px;
 }
 
 /* Add these styles after the save-button styles */
