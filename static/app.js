@@ -689,14 +689,7 @@ function handleMessage(data) {
       break;
     case 'command_response':
       if (data.command === 'friendRequests') {
-        const requests = data.output
-          .split('\n')
-          .filter((line, index) =>
-            index !== 0 && // Filter out first line
-            line.trim() && // Filter out empty lines
-            !line.includes('>') // Filter out command prompt
-          );
-        updateFriendRequests(requests);
+        updateFriendRequests(data.output);
       }
       console.log('command_response', data.output);
       break;
