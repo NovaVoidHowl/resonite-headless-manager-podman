@@ -19,6 +19,30 @@ const AVAILABLE_ROLES = [
   'Admin'
 ];
 
+function showLoadingOverlay(message = 'Processing request...') {
+  const overlay = document.querySelector('.loading-overlay');
+  const loadingText = overlay.querySelector('.loading-text');
+  loadingText.textContent = message;
+  overlay.classList.remove('hidden');
+}
+
+function hideLoadingOverlay() {
+  const overlay = document.querySelector('.loading-overlay');
+  overlay.classList.add('hidden');
+}
+
+function showError(message) {
+  const toast = document.querySelector('.error-toast');
+  const toastMessage = toast.querySelector('.error-toast-message');
+  toastMessage.textContent = message;
+  toast.classList.add('show');
+  
+  // Auto-hide after 5 seconds
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 5000);
+}
+
 function connect() {
   // Use port 8000 for WebSocket connections
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
