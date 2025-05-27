@@ -9,6 +9,8 @@
     "psutil",
     "pycache",
     "Resonite",
+    "unban",
+    "unsilence",
     "uvicorn",
     "venv",
     "Zetaphor"
