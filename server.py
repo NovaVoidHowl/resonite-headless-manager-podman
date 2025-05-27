@@ -328,7 +328,21 @@ async def handle_command(websocket: WebSocket, command: str):
       })
       return
 
-    if command == "users":
+    # Handle specific command types
+    if command == "listbans":
+      bans = parse_bans(output) if output.strip() else []
+      await safe_send_json(websocket, {
+        "type": "bans_update",
+        "bans": bans
+      })
+    elif command == "friendRequests":
+      requests = parse_friend_requests(output) if output.strip() else []
+      await safe_send_json(websocket, {
+          "type": "command_response",
+          "command": command,
+          "output": requests
+      })
+    elif command == "users":
       users = []
       lines = output.split('\n')
       # Process each line that isn't empty and isn't a prompt
@@ -347,60 +361,59 @@ async def handle_command(websocket: WebSocket, command: str):
       await safe_send_json(websocket, {
         "type": "command_response",
         "command": command,
-        "output": output.strip()
+        "output": output.strip() if output.strip() else ""
       })
 
 
 async def handle_status(websocket: WebSocket):
   """Handle status request and system metrics"""
-  async with request_locks['status']:
-    try:
-      # Get container status first
-      status = podman_manager.get_container_status()
-      status_dict = dict(status)
+  try:
+    # Get container status first
+    status = podman_manager.get_container_status()
+    status_dict = dict(status)
 
-      # Parse status data from container status command
-      if podman_manager.is_container_running():
-        status_output = podman_manager.send_command("status")
-        for line in [
-          status_line.strip()
-          for status_line in status_output.split('\n')
-          if status_line.strip() and not status_line.endswith('>')
-        ]:
-          if ': ' in line:
-            key, value = line.split(': ', 1)
-            status_dict[key.strip()] = value.strip()
+    # Add system metrics
+    cpu_percent = psutil.cpu_percent(interval=None)  # Changed to not block
+    memory = psutil.virtual_memory()
+    memory_percent = memory.percent
+    memory_used = f"{memory.used / (1024 * 1024 * 1024):.1f}GB"
+    memory_total = f"{memory.total / (1024 * 1024 * 1024):.1f}GB"
 
-      # Add system metrics
-      cpu_percent = psutil.cpu_percent(interval=1)
-      memory = psutil.virtual_memory()
-      memory_percent = memory.percent
-      memory_used = f"{memory.used / (1024 * 1024 * 1024):.1f}GB"
-      memory_total = f"{memory.total / (1024 * 1024 * 1024):.1f}GB"
+    # Parse status data from container status command if container is running
+    if podman_manager.is_container_running():
+      status_output = podman_manager.send_command("status")
+      for line in [
+        status_line.strip()
+        for status_line in status_output.split('\n')
+        if status_line.strip() and not status_line.endswith('>')
+      ]:
+        if ': ' in line:
+          key, value = line.split(': ', 1)
+          status_dict[key.strip()] = value.strip()
 
-      full_status = {
-        **status_dict,
-        "cpu_usage": cpu_percent,
-        "memory_percent": memory_percent,
-        "memory_used": memory_used,
-        "memory_total": memory_total
-      }
+    full_status = {
+      **status_dict,
+      "cpu_usage": cpu_percent,
+      "memory_percent": memory_percent,
+      "memory_used": memory_used,
+      "memory_total": memory_total
+    }
 
-      if status_dict.get('error'):
-        full_status['status'] = 'stopped'
-        full_status['error_message'] = status_dict['error']
+    if status_dict.get('error'):
+      full_status['status'] = 'stopped'
+      full_status['error_message'] = status_dict['error']
 
+    await safe_send_json(websocket, {
+      "type": "status_update",
+      "status": full_status
+    })
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("Error in handle_status: %s", str(e))
+    if await is_websocket_connected(websocket):
       await safe_send_json(websocket, {
-        "type": "status_update",
-        "status": full_status
+        "type": "error",
+        "message": f"Error getting status: {e}"
       })
-    except (ConnectionError, RuntimeError) as e:
-      logger.error("Error in handle_status: %s", str(e))
-      if await is_websocket_connected(websocket):
-        await safe_send_json(websocket, {
-          "type": "error",
-          "message": f"Error getting status: {e}"
-        })
 
 
 def parse_key_value(key: str, value: str) -> Any:
@@ -636,36 +649,26 @@ async def monitor_websocket(websocket: WebSocket, callback):
 @app.websocket("/ws/logs")
 async def logs_endpoint(websocket: WebSocket):
   """Handle container logs WebSocket connections"""
-  await websocket.accept()
+  await logs_manager.connect(websocket)
+
   try:
     while await is_websocket_connected(websocket):
       message = await websocket.receive()
       if message["type"] == "websocket.receive" and "text" in message:
-        # Handle JSON messages
         data = json.loads(message["text"])
-        await handle_logs_message(websocket, data)
-      # Binary messages are ignored
+        if data.get("type") == "get_logs":
+          output = podman_manager.get_container_logs()
+          await safe_send_json(websocket, {
+            "type": "logs_update",
+            "output": output
+          })
+
   except WebSocketDisconnect:
     logger.info("Logs WebSocket disconnected normally")
   except (ConnectionError, RuntimeError, json.JSONDecodeError) as e:
     logger.error("Logs WebSocket error: %s", str(e))
-
-
-async def handle_logs_message(websocket: WebSocket, data: dict):
-  """Handle logs-specific messages"""
-  try:
-    if data.get("type") == "get_logs":
-      output = podman_manager.get_container_logs()
-      await send_json_message(websocket, {
-        "type": "logs_update",
-        "output": output
-      })
-  except (ConnectionError, RuntimeError, KeyError) as e:
-    logger.error("Error handling logs message: %s", str(e))
-    await send_json_message(websocket, {
-      "type": "error",
-      "message": str(e)
-    })
+  finally:
+    await logs_manager.disconnect(websocket)
 
 
 @app.websocket("/ws/status")

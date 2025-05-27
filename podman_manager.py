@@ -514,6 +514,11 @@ class PodmanManager:
 
       container = self.client.containers.get(self.container_name)
       logs = container.logs()
+
+      # Handle generator object case
+      if hasattr(logs, '__next__'):
+        return ''.join([line.decode('utf-8') if isinstance(line, bytes) else str(line) for line in logs])
+
       return logs.decode('utf-8') if isinstance(logs, bytes) else str(logs)
     except (ConnectionError, RuntimeError, podman_errors.ContainerNotFound) as e:
       logger.error("Error getting container logs: %s", str(e))
