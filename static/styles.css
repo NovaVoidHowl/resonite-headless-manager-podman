@@ -1675,3 +1675,40 @@ button:active {
   background-color: #4CAF5044;
 }
 
+/* Add styles for log lines with timestamps */
+.log-line {
+    position: relative;
+    padding-left: 80px;
+    min-height: 20px;
+    line-height: 20px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: var(--log-text-color, #ffffff);
+}
+
+.log-line::before {
+    content: attr(data-timestamp);
+    position: absolute;
+    left: 0;
+    color: var(--timestamp-color, #666);
+    font-size: 0.9em;
+    width: 75px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --log-text-color: #000000;
+        --timestamp-color: #666666;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --log-text-color: #ffffff;
+        --timestamp-color: #888888;
+    }
+}
+
