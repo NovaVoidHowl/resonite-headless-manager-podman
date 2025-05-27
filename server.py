@@ -35,6 +35,14 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Create locks for different request types
+request_locks = {
+    'status': asyncio.Lock(),
+    'worlds': asyncio.Lock(),
+    'command': asyncio.Lock(),
+    'config': asyncio.Lock()
+}
+
 app = FastAPI()
 
 # Get server IP from environment
@@ -174,55 +182,58 @@ async def get():
 
 async def handle_command(websocket: WebSocket, command: str):
   """Handle command execution and response"""
-  output = podman_manager.send_command(command)
+  async with request_locks['command']:
+    logger.info("Executing command: %s", command)
+    output = podman_manager.send_command(command)
 
-  if command == "listbans":
-    bans = parse_bans(output)
-    await safe_send_json(websocket, {
-      "type": "bans_update",
-      "bans": bans
-    })
-  else:
-    await safe_send_json(websocket, {
-      "type": "command_response",
-      "command": command,
-      "output": output
-    })
+    if command == "listbans":
+      bans = parse_bans(output)
+      await safe_send_json(websocket, {
+        "type": "bans_update",
+        "bans": bans
+      })
+    else:
+      await safe_send_json(websocket, {
+        "type": "command_response",
+        "command": command,
+        "output": output
+      })
 
 
 async def handle_status(websocket: WebSocket):
   """Handle status request and system metrics"""
-  try:
-    status = podman_manager.get_container_status()
-    status_dict = dict(status)  # Convert to dictionary if it's not already
+  async with request_locks['status']:
+    try:
+      status = podman_manager.get_container_status()
+      status_dict = dict(status)  # Convert to dictionary if it's not already
 
-    cpu_percent = psutil.cpu_percent(interval=1)
-    memory = psutil.virtual_memory()
-    memory_percent = memory.percent
-    memory_used = f"{memory.used / (1024 * 1024 * 1024):.1f}GB"
-    memory_total = f"{memory.total / (1024 * 1024 * 1024):.1f}GB"
+      cpu_percent = psutil.cpu_percent(interval=1)
+      memory = psutil.virtual_memory()
+      memory_percent = memory.percent
+      memory_used = f"{memory.used / (1024 * 1024 * 1024):.1f}GB"
+      memory_total = f"{memory.total / (1024 * 1024 * 1024):.1f}GB"
 
-    # Create a new dictionary with all status data
-    full_status = {
-      **status_dict,
-      "cpu_usage": cpu_percent,
-      "memory_percent": memory_percent,
-      "memory_used": memory_used,
-      "memory_total": memory_total
-    }
+      # Create a new dictionary with all status data
+      full_status = {
+        **status_dict,
+        "cpu_usage": cpu_percent,
+        "memory_percent": memory_percent,
+        "memory_used": memory_used,
+        "memory_total": memory_total
+      }
 
-    await safe_send_json(websocket, {
-      "type": "status_update",
-      "status": full_status
-    })
-  except (ConnectionError, RuntimeError) as e:
-    logger.error("Error in handle_status: %s", str(e))
-    # Only try to send error if connection is still valid
-    if await is_websocket_connected(websocket):
       await safe_send_json(websocket, {
-        "type": "error",
-        "message": f"Error getting status: {e}"
+        "type": "status_update",
+        "status": full_status
       })
+    except (ConnectionError, RuntimeError) as e:
+      logger.error("Error in handle_status: %s", str(e))
+      # Only try to send error if connection is still valid
+      if await is_websocket_connected(websocket):
+        await safe_send_json(websocket, {
+          "type": "error",
+          "message": f"Error getting status: {e}"
+        })
 
 
 def parse_key_value(key: str, value: str) -> Any:
@@ -363,41 +374,52 @@ async def get_world_data(world_line: str, index: int) -> dict | None:
 
 async def handle_worlds(websocket: WebSocket):
   """Handle worlds request and data collection"""
-  worlds_output = podman_manager.send_command("worlds")
-  worlds_output_lines = worlds_output.split('\n')
+  async with request_locks['worlds']:
+    worlds_output = podman_manager.send_command("worlds")
+    worlds_output_lines = worlds_output.split('\n')
 
-  # Filter out empty lines and command prompt
-  worlds_lines = [line for line in worlds_output_lines if line.strip() and not line.endswith('>')]
+    # Filter out empty lines and command prompt
+    worlds_lines = [line for line in worlds_output_lines if line.strip() and not line.endswith('>')]
 
-  # Skip the first line if it's just column headers
-  if len(worlds_lines) > 0 and not worlds_lines[0].strip().startswith('['):
-    worlds_lines = worlds_lines[1:]
+    # Skip the first line if it's just column headers
+    if len(worlds_lines) > 0 and not worlds_lines[0].strip().startswith('['):
+      worlds_lines = worlds_lines[1:]
 
-  logger.info("Found %d world(s) to process", len(worlds_lines))
+    logger.info("Found %d world(s) to process", len(worlds_lines))
 
-  worlds = []
-  for i, world in enumerate(worlds_lines):
-    try:
-      world_data = await get_world_data(world, i)
-      if world_data:
-        worlds.append(world_data)
-        logger.info("Successfully processed world: %s", world_data['name'])
-      else:
-        logger.warning("Failed to process world line: %s", world)
-    except (ValueError, KeyError, ConnectionError, RuntimeError) as e:
-      logger.error("Error processing world %d: %s", i, str(e))
+    worlds = []
+    for i, world in enumerate(worlds_lines):
+      try:
+        world_data = await get_world_data(world, i)
+        if world_data:
+          worlds.append(world_data)
+          logger.info("Successfully processed world: %s", world_data['name'])
+        else:
+          logger.warning("Failed to process world line: %s", world)
+      except (ValueError, KeyError, ConnectionError, RuntimeError) as e:
+        logger.error("Error processing world %d: %s", i, str(e))
 
-  logger.info("Sending %d world(s) to client", len(worlds))
-  await safe_send_json(websocket, {
-    "type": "worlds_update",
-    "output": worlds
-  })
+    logger.info("Sending %d world(s) to client", len(worlds))
+    await safe_send_json(websocket, {
+      "type": "worlds_update",
+      "output": worlds
+    })
 
 
 async def handle_websocket_message(websocket: WebSocket, message: str):
   """Handle individual WebSocket messages"""
   try:
     data = json.loads(message)
+    message_type = data.get("type", "")
+
+    if message_type in request_locks:
+      if request_locks[message_type].locked():
+        logger.warning("Request of type %s already in progress, skipping", message_type)
+        await safe_send_json(websocket, {
+          "type": "error",
+          "message": f"A {message_type} request is already in progress"
+        })
+        return
 
     if data["type"] == "command":
       await handle_command(websocket, data["command"])
