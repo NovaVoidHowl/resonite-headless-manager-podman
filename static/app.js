@@ -209,15 +209,24 @@ function updateContainerControls(status) {
   const restartBtn = document.getElementById('restartContainer');
   
   if (status === 'running') {
+    startBtn.classList.add('hidden');
+    stopBtn.classList.remove('hidden');
+    restartBtn.classList.remove('hidden');
     startBtn.disabled = true;
     stopBtn.disabled = false;
     restartBtn.disabled = false;
   } else if (status === 'stopped') {
+    startBtn.classList.remove('hidden');
+    stopBtn.classList.add('hidden');
+    restartBtn.classList.add('hidden');
     startBtn.disabled = false;
     stopBtn.disabled = true;
     restartBtn.disabled = true;
   } else {
-    // For unknown status, disable all
+    // For unknown status, hide all buttons
+    startBtn.classList.add('hidden');
+    stopBtn.classList.add('hidden');
+    restartBtn.classList.add('hidden');
     startBtn.disabled = true;
     stopBtn.disabled = true;
     restartBtn.disabled = true;

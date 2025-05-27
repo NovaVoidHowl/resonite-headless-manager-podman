@@ -1542,3 +1542,48 @@ button:active {
 
 }
 
+/* Add styles for container control buttons and their visibility states */
+.container-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.container-control-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.container-control-btn:hover {
+  transform: translateY(-1px);
+}
+
+.container-control-btn:active {
+  transform: translateY(0);
+}
+
+.container-control-btn.start {
+  background-color: #4CAF50;
+}
+
+.container-control-btn.stop {
+  background-color: #f44336;
+}
+
+.container-control-btn.restart {
+  background-color: #ff9800;
+}
+
+.container-control-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.container-control-btn.hidden {
+  display: none;
+}
+
