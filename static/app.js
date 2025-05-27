@@ -142,6 +142,88 @@ function appendOutput(text, className = '') {
   output.scrollTop = output.scrollHeight;
 }
 
+// Container control functions
+async function startContainer() {
+  try {
+    showLoadingOverlay('Starting container...');
+    const response = await fetch(`http://${window.location.hostname}:8000/api/start-container`, {
+      method: 'POST'
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to start container');
+    }
+    
+    hideLoadingOverlay();
+    updateContainerControls('running');
+  } catch (error) {
+    hideLoadingOverlay();
+    showError(error.message);
+  }
+}
+
+async function stopContainer() {
+  try {
+    showLoadingOverlay('Stopping container...');
+    const response = await fetch(`http://${window.location.hostname}:8000/api/stop-container`, {
+      method: 'POST'
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to stop container');
+    }
+    
+    hideLoadingOverlay();
+    updateContainerControls('stopped');
+  } catch (error) {
+    hideLoadingOverlay();
+    showError(error.message);
+  }
+}
+
+async function restartContainer() {
+  try {
+    showLoadingOverlay('Restarting container...');
+    const response = await fetch(`http://${window.location.hostname}:8000/api/restart-container`, {
+      method: 'POST'
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to restart container');
+    }
+    
+    hideLoadingOverlay();
+    updateContainerControls('running');
+  } catch (error) {
+    hideLoadingOverlay();
+    showError(error.message);
+  }
+}
+
+function updateContainerControls(status) {
+  const startBtn = document.getElementById('startContainer');
+  const stopBtn = document.getElementById('stopContainer');
+  const restartBtn = document.getElementById('restartContainer');
+  
+  if (status === 'running') {
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    restartBtn.disabled = false;
+  } else if (status === 'stopped') {
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    restartBtn.disabled = true;
+  } else {
+    // For unknown status, disable all
+    startBtn.disabled = true;
+    stopBtn.disabled = true;
+    restartBtn.disabled = true;
+  }
+}
+
 function updateStatus(status) {
   const statusDiv = document.getElementById('status');
   const statusText = statusDiv.querySelector('.status-text');
@@ -160,6 +242,7 @@ function updateStatus(status) {
   if (status.error) {
     statusDiv.classList.add('status-stopped');
     statusText.textContent = `Error - ${status.error}`;
+    updateContainerControls('stopped');
     return;
   }
 
@@ -175,10 +258,12 @@ function updateStatus(status) {
   switch (status.status.toLowerCase()) {
     case 'running':
       statusDiv.classList.add('status-running');
+      updateContainerControls('running');
       break;
     case 'stopped':
     case 'exited':
       statusDiv.classList.add('status-stopped');
+      updateContainerControls('stopped');
       break;
     default:
       statusDiv.classList.add('status-connecting');

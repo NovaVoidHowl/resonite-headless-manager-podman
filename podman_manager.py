@@ -289,3 +289,59 @@ class PodmanManager:
     except (ConnectionError, RuntimeError, podman_errors.ContainerNotFound) as e:
       logger.error("Failed to restart container: %s", str(e))
       raise RuntimeError(f"Failed to restart container: {str(e)}") from e
+
+  def start_container(self) -> None:
+    """Start the Podman container."""
+    try:
+      if not self.client:
+        raise RuntimeError(ERROR_CLIENT_NOT_INITIALIZED)
+        
+      container = self.client.containers.get(self.container_name)
+      container.start()
+      
+      # Wait for container to be running
+      retries = 0
+      max_retries = 10
+      while retries < max_retries:
+        container.reload()
+        if container.status == 'running':
+          logger.info("Container successfully started")
+          return
+        time.sleep(1)
+        retries += 1
+      
+      logger.warning("Container start took longer than expected")
+      
+    except (ConnectionError, RuntimeError, podman_errors.ContainerNotFound) as e:
+      logger.error("Failed to start container: %s", str(e))
+      raise RuntimeError(f"Failed to start container: {str(e)}") from e
+
+  def stop_container(self) -> None:
+    """Stop the Podman container."""
+    try:
+      if not self.client:
+        raise RuntimeError(ERROR_CLIENT_NOT_INITIALIZED)
+        
+      container = self.client.containers.get(self.container_name)
+      
+      # Stop monitoring if it's running
+      self._monitor_running = False
+      
+      container.stop()
+      
+      # Wait for container to be stopped
+      retries = 0
+      max_retries = 10
+      while retries < max_retries:
+        container.reload()
+        if container.status != 'running':
+          logger.info("Container successfully stopped")
+          return
+        time.sleep(1)
+        retries += 1
+      
+      logger.warning("Container stop took longer than expected")
+      
+    except (ConnectionError, RuntimeError, podman_errors.ContainerNotFound) as e:
+      logger.error("Failed to stop container: %s", str(e))
+      raise RuntimeError(f"Failed to stop container: {str(e)}") from e

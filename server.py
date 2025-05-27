@@ -614,6 +614,32 @@ async def restart_container():
     raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.post("/api/start-container")
+async def start_container():
+  """Start the Docker container"""
+  try:
+    if not podman_manager.is_container_running():
+      podman_manager.start_container()
+      return JSONResponse(content={"message": "Container start initiated"})
+    return JSONResponse(content={"message": "Container is already running"})
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("Error starting container: %s", str(e))
+    raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/stop-container")
+async def stop_container():
+  """Stop the Docker container"""
+  try:
+    if podman_manager.is_container_running():
+      podman_manager.stop_container()
+      return JSONResponse(content={"message": "Container stop initiated"})
+    return JSONResponse(content={"message": "Container is already stopped"})
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("Error stopping container: %s", str(e))
+    raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 if __name__ == "__main__":
   import uvicorn
   uvicorn.run(app, host="0.0.0.0", port=8000)
