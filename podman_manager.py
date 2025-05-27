@@ -1,3 +1,14 @@
+"""
+Podman container management module for the Resonite Headless Manager.
+
+This module provides functionality to:
+- Control and monitor Podman containers
+- Execute commands within containers
+- Stream and process container logs
+- Handle container lifecycle (start/stop/restart)
+- Monitor container health and status
+"""
+
 import logging
 import os
 import re
@@ -24,7 +35,24 @@ ERROR_CONTAINER_NOT_RUNNING = "Container is not running"
 
 
 class PodmanManager:
+  """
+  Manages Podman container operations and monitoring.
+
+  This class provides a high-level interface for:
+  - Container lifecycle management (start/stop/restart)
+  - Command execution within containers
+  - Log streaming and monitoring
+  - Container status checking
+  - Output buffering and processing
+  """
+
   def __init__(self, container_name: str):
+    """
+    Initialize the PodmanManager instance.
+
+    Args:
+        container_name (str): The name of the container to manage
+    """
     self.container_name = container_name
     self.output_buffer: deque = deque(maxlen=25)
     self.buffer_lock: Lock = Lock()
@@ -36,7 +64,9 @@ class PodmanManager:
     self._init_client()
 
   def _init_client(self) -> None:
-    """Initialize the podman client"""
+    """
+    Initialize the podman client.
+    """
     connection_error = None
     connection_methods = [
       {"uri": "http+unix:///run/podman/podman.sock", "desc": "Unix socket"},
@@ -64,23 +94,51 @@ class PodmanManager:
     self.client = None
 
   def clean_output(self, text: str) -> List[str]:
-    """Clean and format output text by removing ANSI sequences and handling line breaks"""
+    """
+    Clean and format output text by removing ANSI sequences and handling line breaks.
+
+    Args:
+        text (str): The text to clean
+
+    Returns:
+        List[str]: List of cleaned lines
+    """
     clean_text = self.ansi_escape.sub('', text)
     lines = [line.strip() for line in clean_text.replace('\r\n', '\n').split('\n')]
     return [line for line in lines if line]
 
   def add_to_buffer(self, text: str) -> None:
+    """
+    Add processed text to the output buffer.
+
+    Args:
+        text (str): The text to be added to the buffer after cleaning
+    """
     with self.buffer_lock:
       clean_lines = self.clean_output(text)
       for line in clean_lines:
         self.output_buffer.append(line)
 
   def get_recent_lines(self, count: int = 50) -> List[str]:
+    """
+    Retrieve the most recent lines from the output buffer.
+
+    Args:
+        count (int, optional): Number of recent lines to retrieve. Defaults to 50.
+
+    Returns:
+        List[str]: List of the most recent output lines
+    """
     with self.buffer_lock:
       return list(self.output_buffer)[-count:]
 
   def is_container_running(self) -> bool:
-    """Check if the container is currently running."""
+    """
+    Check if the container is currently running.
+
+    Returns:
+        bool: True if the container is running, False otherwise
+    """
     try:
       if not self.client:
         return False
@@ -91,7 +149,16 @@ class PodmanManager:
       return False
 
   def _execute_command_process(self, command: str, output_path: str) -> subprocess.Popen:
-    """Execute the podman attach process and send command."""
+    """
+    Execute the podman attach process and send command.
+
+    Args:
+        command (str): The command to execute
+        output_path (str): Path to the output file
+
+    Returns:
+        subprocess.Popen: The process object
+    """
     attach_cmd = [
       "script", "-q", output_path, "-c",
       f"podman attach --detach-keys='ctrl-d' {self.container_name}"
@@ -117,7 +184,15 @@ class PodmanManager:
     return process
 
   def _process_users_command(self, clean_lines: List[str]) -> List[str]:
-    """Process output specifically for the users command"""
+    """
+    Process output specifically for the users command.
+
+    Args:
+        clean_lines (List[str]): Cleaned lines of output
+
+    Returns:
+        List[str]: Processed lines specific to the users command
+    """
     response_lines = []
     start_idx = 1 if len(clean_lines) > 0 and 'Username' in clean_lines[0] else 0
     for line in clean_lines[start_idx:]:
@@ -128,7 +203,16 @@ class PodmanManager:
     return response_lines
 
   def _process_generic_command(self, clean_lines: List[str], command: str) -> List[str]:
-    """Process output for general commands"""
+    """
+    Process output for general commands.
+
+    Args:
+        clean_lines (List[str]): Cleaned lines of output
+        command (str): The command that was executed
+
+    Returns:
+        List[str]: Processed lines for the command
+    """
     response_lines = []
     capture_started = False
     for line in clean_lines:
@@ -141,7 +225,16 @@ class PodmanManager:
     return response_lines
 
   def _process_command_output(self, output: str, command: str) -> str:
-    """Process and parse command output."""
+    """
+    Process and parse command output.
+
+    Args:
+        output (str): Raw output from the command
+        command (str): The command that was executed
+
+    Returns:
+        str: Processed output
+    """
     clean_lines = self.clean_output(output)
     logger.info("Captured %d lines of output", len(clean_lines))
 
@@ -159,7 +252,16 @@ class PodmanManager:
     return ""
 
   def send_command(self, command: str, timeout: int = 10) -> str:
-    """Send a command to the container's console."""
+    """
+    Send a command to the container's console.
+
+    Args:
+        command (str): The command to send
+        timeout (int, optional): Timeout for the command execution. Defaults to 10.
+
+    Returns:
+        str: The output of the command
+    """
     logger.info("Sending command to container: %s", command)
 
     try:
@@ -212,7 +314,13 @@ class PodmanManager:
       return f"Error: {error_msg}"
 
   def _process_logs(self, container: Container, callback) -> None:
-    """Process container logs."""
+    """
+    Process container logs.
+
+    Args:
+        container (Container): The container object
+        callback (function): Callback function to handle log lines
+    """
     try:
       for log_line in container.logs(
         stdout=True,
@@ -234,7 +342,12 @@ class PodmanManager:
       logger.error("Error in log monitoring: %s", str(e))
 
   def monitor_output(self, callback) -> None:
-    """Monitor container output continuously."""
+    """
+    Monitor container output continuously.
+
+    Args:
+        callback (function): Callback function to handle log lines
+    """
     self._monitor_running = True
     logger.info("Starting container log monitoring")
 
@@ -268,7 +381,12 @@ class PodmanManager:
       self._monitor_running = False
 
   def get_container_status(self) -> Dict[str, Any]:
-    """Get container status information."""
+    """
+    Get container status information.
+
+    Returns:
+        Dict[str, Any]: Dictionary containing container status information
+    """
     try:
       if not self.client:
         return {'error': ERROR_CLIENT_NOT_INITIALIZED, 'status': 'unknown'}
@@ -287,7 +405,12 @@ class PodmanManager:
       return {'error': str(e), 'status': 'unknown'}
 
   def restart_container(self) -> bool:
-    """Safely restart the Podman container."""
+    """
+    Safely restart the Podman container.
+
+    Returns:
+        bool: True if the container was successfully restarted, False otherwise
+    """
     try:
       if not self.client:
         raise RuntimeError(ERROR_CLIENT_NOT_INITIALIZED)
@@ -316,7 +439,9 @@ class PodmanManager:
       raise RuntimeError(f"Failed to restart container: {str(e)}") from e
 
   def start_container(self) -> None:
-    """Start the Podman container."""
+    """
+    Start the Podman container.
+    """
     try:
       if not self.client:
         raise RuntimeError(ERROR_CLIENT_NOT_INITIALIZED)
@@ -342,7 +467,9 @@ class PodmanManager:
       raise RuntimeError(f"Failed to start container: {str(e)}") from e
 
   def stop_container(self) -> None:
-    """Stop the Podman container."""
+    """
+    Stop the Podman container.
+    """
     try:
       if not self.client:
         raise RuntimeError(ERROR_CLIENT_NOT_INITIALIZED)
@@ -372,7 +499,12 @@ class PodmanManager:
       raise RuntimeError(f"Failed to stop container: {str(e)}") from e
 
   def get_container_logs(self) -> str:
-    """Get container logs"""
+    """
+    Get container logs.
+
+    Returns:
+        str: The logs of the container
+    """
     try:
       if not self.is_container_running():
         return "Container is not running"

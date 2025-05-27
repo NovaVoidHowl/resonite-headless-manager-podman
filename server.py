@@ -77,13 +77,31 @@ class ConnectionManager:
     self.active_connections = set()
 
   async def connect(self, websocket: WebSocket):
+    """
+    Accept and add a new WebSocket connection.
+
+    Args:
+        websocket (WebSocket): The WebSocket connection to add
+    """
     await websocket.accept()
     self.active_connections.add(websocket)
 
   async def disconnect(self, websocket: WebSocket):
+    """
+    Remove a WebSocket connection from active connections.
+
+    Args:
+        websocket (WebSocket): The WebSocket connection to remove
+    """
     self.active_connections.remove(websocket)
 
   async def broadcast(self, message: dict):
+    """
+    Broadcast a message to all active WebSocket connections.
+
+    Args:
+        message (dict): The message to broadcast to all connections
+    """
     for connection in self.active_connections.copy():
       try:
         await safe_send_json(connection, message)
