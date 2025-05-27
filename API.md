@@ -5,7 +5,13 @@ This enables you to create custom clients or automation tools.
 
 ## Connection
 
-Connect to the WebSocket endpoint at `ws://your-server-ip:8000/ws`
+The application provides multiple WebSocket endpoints:
+
+- `ws://your-server-ip:8000/ws/command` - For sending commands to the server
+- `ws://your-server-ip:8000/ws/worlds` - For worlds monitoring
+- `ws://your-server-ip:8000/ws/status` - For status monitoring
+- `ws://your-server-ip:8000/ws/logs` - For container logs monitoring
+- `ws://your-server-ip:8000/ws/heartbeat` - Heartbeat connection to keep other WebSockets alive
 
 ## Message Format
 
@@ -36,6 +42,8 @@ Send a command to the headless server:
 Special commands:
 
 - `listbans` - Returns a structured list of banned users
+- `friendRequests` - Returns a list of pending friend requests
+- `worlds` - Returns information about all running worlds
 
 ### 2. Status Request
 
@@ -56,6 +64,16 @@ Get information about all running worlds:
 ```json
 {
   "type": "get_worlds"
+}
+```
+
+### 4. Logs Request
+
+Get container logs:
+
+```json
+{
+  "type": "get_logs"
 }
 ```
 
@@ -97,11 +115,14 @@ Response to status request:
 {
   "type": "status_update",
   "status": {
+    "status": "running",
     "cpu_usage": "5.2",
     "memory_percent": "45.3",
     "memory_used": "4.2GB",
     "memory_total": "16.0GB",
-    // Additional container status information
+    "name": "container_name",
+    "id": "container_id",
+    "image": "container_image"
   }
 }
 ```
@@ -141,7 +162,30 @@ Response to worlds request:
 }
 ```
 
-### 5. Error Response
+### 5. Logs Update
+
+Response to logs request:
+
+```json
+{
+  "type": "logs_update",
+  "output": "container logs content"
+}
+```
+
+### 6. Container Output
+
+Real-time container output messages:
+
+```json
+{
+  "type": "container_output",
+  "output": "output_text",
+  "timestamp": "2025-05-27T12:34:56.789"
+}
+```
+
+### 7. Error Response
 
 When an error occurs:
 
@@ -152,13 +196,19 @@ When an error occurs:
 }
 ```
 
-## Real-time Updates
+## HTTP Endpoints
 
-The WebSocket connection also receives real-time container output messages:
+The application also provides REST endpoints:
 
-```json
-{
-  "type": "container_output",
-  "output": "output_text"
-}
-```
+### 1. Configuration Management
+
+- `GET /config` - Get the current headless server configuration
+- `POST /config` - Update the headless server configuration
+
+## Additional Features
+
+- Real-time monitoring of container status, resource usage, and logs
+- Automatic reconnection handling
+- Connection state management
+- CORS support for web interface integration
+- Heartbeat mechanism to keep connections alive
