@@ -170,29 +170,26 @@ def parse_bans(output):
 
 
 def parse_friend_requests(output):
-  """Parse the friend requests output into a list of usernames.
-
-  Args:
-    output (str): Raw output from the friendRequests command
-
-  Returns:
-    list: List of usernames who have sent friend requests
-  """
-  requests = []
-  # Split by newlines and skip the first line (header) and last line (prompt)
-  lines = output.split('\n')[1:-1]
-
-  for line in lines:
-    line = line.strip()
-    # Skip empty lines and command prompts
-    if line and not line.endswith('>'):
-      # Extract username from the line
-      if ':' in line:  # If line contains user info
-        username = line.split(':')[1].strip()
-        if username:
-          requests.append(username)
-
-  return requests
+    """Parse the friend requests output into a list of usernames."""
+    logger.info("Raw friend requests output (before parsing): %s", repr(output))  # Use repr to show whitespace/newlines
+    requests = []
+    
+    # Remove empty lines and command prompts
+    lines = [line.strip() for line in output.split('\n') if line.strip() and not line.endswith('>')]
+    logger.info("Lines after initial filtering: %s", repr(lines))
+    
+    # Skip the header line if it exists
+    if lines and lines[0].lower().startswith('friend request'):
+        lines = lines[1:]
+    
+    for line in lines:
+        # Directly add any non-empty line that isn't a system message
+        if line and not line.startswith('==='):
+            requests.append(line)
+            logger.info("Added friend request: %s", line)
+    
+    logger.info("Final parsed requests: %s", requests)
+    return requests
 
 
 @app.get("/")
@@ -211,6 +208,7 @@ async def handle_command(websocket: WebSocket, command: str):
   async with request_locks['command']:
     logger.info("Executing command: %s", command)
     output = podman_manager.send_command(command)
+    logger.info("Raw command output: %s", output)  # Debug log
 
     # Check if the output indicates container is not running
     if output.startswith("Error: Container is not running"):
@@ -228,6 +226,7 @@ async def handle_command(websocket: WebSocket, command: str):
       })
     elif command == "friendRequests":
       requests = parse_friend_requests(output)
+      logger.info("Sending friend requests to client: %s", requests)  # Debug log
       await safe_send_json(websocket, {
         "type": "command_response",
         "command": command,
