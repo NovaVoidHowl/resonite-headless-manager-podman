@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 import podman
 from podman import errors as podman_errors
 from podman.domain.containers import Container
+import urllib3
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +31,8 @@ class PodmanManager:
     self.ansi_escape = re.compile(r'(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]|\x1B[()][AB012]')
     self._monitor_running: bool = False
     self.client: Optional[podman.PodmanClient] = None
+    # Create a custom connection pool with higher max size
+    self.pool_manager = urllib3.PoolManager(maxsize=25)
     self._init_client()
 
   def _init_client(self) -> None:
@@ -44,7 +47,10 @@ class PodmanManager:
     for method in connection_methods:
       try:
         logger.info("Trying to connect using %s", method['desc'])
-        client = podman.PodmanClient(base_url=method["uri"])
+        client = podman.PodmanClient(
+          base_url=method["uri"],
+          pool_manager=self.pool_manager
+        )
         client.ping()
         container = client.containers.get(self.container_name)
         logger.info("Container found: %s (ID: %s)", container.name, container.id)

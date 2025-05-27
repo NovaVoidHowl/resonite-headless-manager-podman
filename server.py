@@ -325,20 +325,36 @@ def parse_user_data(user_line: str) -> dict | None:
 
 
 async def get_world_users(world_index: int) -> list:
-  """Get users data for a specific world"""
-  podman_manager.send_command(f"focus {world_index}")
-  time.sleep(1)  # Allow time for focus to take effect
+    """Get users data for a specific world"""
+    # Send focus command and wait for it to take effect
+    focus_output = podman_manager.send_command(f"focus {world_index}")
+    if "Error" in focus_output:
+        logger.error("Failed to focus world %d: %s", world_index, focus_output)
+        return []
 
-  users_output = podman_manager.send_command("users")
-  users_lines = users_output.split('\n')[1:-1]
+    # Wait for focus to take effect
+    time.sleep(1)
 
-  users_data = []
-  for user_line in users_lines:
-    user_info = parse_user_data(user_line)
-    if user_info:
-      users_data.append(user_info)
+    # Get users and parse output
+    users_output = podman_manager.send_command("users")
+    if "Error" in users_output:
+        logger.error("Failed to get users for world %d: %s", world_index, users_output)
+        return []
 
-  return users_data
+    # Split output into lines and remove first line (header) and last line (prompt)
+    users_lines = [line.strip() for line in users_output.split('\n') if line.strip()]
+    if len(users_lines) > 1:  # Check if we have any lines besides the header
+        users_lines = users_lines[1:-1]
+    else:
+        return []
+
+    users_data = []
+    for user_line in users_lines:
+        user_info = parse_user_data(user_line)
+        if user_info:
+            users_data.append(user_info)
+
+    return users_data
 
 
 async def get_world_data(world_line: str, index: int) -> dict | None:
