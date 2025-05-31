@@ -30,18 +30,12 @@ class Config:
   Application configuration management.
   """
   def __init__(self, config_file: str = "config.json"):
-    """
-    Initialize configuration.
-
-    Args:
-        config_file (str, optional): Configuration file path. Defaults to "config.json".
-    """
     self.config_file = config_file
     self.cache_config = CacheConfig()
     self.load_config()
 
   def load_config(self) -> None:
-    """Load configuration from file"""
+    """Load configuration from file if it exists, otherwise use defaults"""
     try:
       if os.path.exists(self.config_file):
         with open(self.config_file, 'r', encoding='utf-8') as f:
@@ -50,8 +44,7 @@ class Config:
             self.cache_config = CacheConfig(**data['cache'])
           logger.info("Loaded configuration from %s", self.config_file)
       else:
-        self.save_config()  # Create default config
-        logger.info("Created default configuration in %s", self.config_file)
+        logger.info("No config file found at %s, using built-in defaults", self.config_file)
     except json.JSONDecodeError as e:
       logger.error("JSON decode error loading config: %s", str(e))
     except OSError as e:
@@ -111,7 +104,7 @@ class Config:
         "status": "unchanged",
         "message": "Config file already exists and is being used"
       }
-    
+
     self.save_config()
     return {
       "status": "created",
