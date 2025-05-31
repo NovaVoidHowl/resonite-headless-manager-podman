@@ -1050,10 +1050,25 @@ button {
 
 .collapse-icon {
   transition: transform 0.3s ease;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  text-align: center;
+  line-height: 1;
 }
 
 .collapsible.collapsed .collapse-icon {
   transform: rotate(-90deg);
+}
+
+/* Ensure container controls collapse icon maintains consistent size */
+.container-controls-title .collapse-icon {
+  font-size: inherit;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  text-align: center;
+  line-height: 1;
 }
 
 .card-content {
