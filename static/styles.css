@@ -197,10 +197,6 @@ button {
   font-weight: bold;
 }
 
-button:hover {
-  background-color: #45a049;
-}
-
 button:active {
   background-color: #3d8b40;
 }
@@ -1562,7 +1558,6 @@ button:active {
   text-align: left;
   background: none;
   border: none;
-  border-bottom: 1px solid #3a3a3a;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
