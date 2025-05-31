@@ -67,6 +67,13 @@ podman_manager = PodmanManager(
   os.getenv('CONTAINER_NAME', 'resonite-headless')  # Fallback to 'resonite-headless' if not set
 )
 
+# Simple cache for parsed worlds data
+parsed_worlds_cache = {
+  "data": [],
+  "timestamp": None,
+  "cache_duration": 10  # Cache for 10 seconds
+}
+
 
 @dataclass
 class ConnectionManager:
@@ -537,17 +544,20 @@ async def get_world_data(world_line: str, index: int) -> dict | None:
         key, value = line.split(': ', 1)
         status_data[key.strip()] = value.strip()
 
-    # Build world data object
+    # Build world data object with the requested structure
     world_data = {
+      "id": index,
       "name": name,
       "sessionId": status_data.get("SessionID", ""),
-      "users": user_count,
-      "present": present_count,
-      "maxUsers": max_users,
+      "user_count": {
+        "present": present_count,
+        "connected_to_instance": user_count,
+        "max_users": max_users
+      },
+      "access_level": access_level,
       "uptime": format_uptime(status_data.get("Uptime", "")),
-      "accessLevel": access_level,
       "hidden": status_data.get("Hidden from listing", "False") == "True",
-      "mobileFriendly": status_data.get("Mobile Friendly", "False") == "True",
+      "mobile_friendly": status_data.get("Mobile Friendly", "False") == "True",
       "description": status_data.get("Description", ""),
       "tags": status_data.get("Tags", "")
     }
@@ -570,7 +580,7 @@ async def handle_worlds(websocket: WebSocket):
     if not podman_manager.is_container_running():
       await safe_send_json(websocket, {
         "type": "worlds_update",
-        "output": [],
+        "worlds_data": [],
         "error": "Container is not running. Please start the container first.",
         "timestamp": datetime.now().isoformat()
       })
@@ -600,16 +610,15 @@ async def handle_worlds(websocket: WebSocket):
       except (ValueError, KeyError, ConnectionError, RuntimeError) as e:
         logger.error("Error processing world %d: %s", i, str(e))
 
-    # Get data and timestamp from cache if available
-    cache_result = podman_manager.command_cache.get_with_timestamp("worlds")
+    # Cache the parsed worlds data (not the raw command output)
     timestamp = datetime.now()
-    if cache_result:
-      _, timestamp = cache_result
+    parsed_worlds_cache["data"] = worlds
+    parsed_worlds_cache["timestamp"] = timestamp
 
     logger.info("Sending %d world(s) to client", len(worlds))
     await safe_send_json(websocket, {
       "type": "worlds_update",
-      "output": worlds,
+      "worlds_data": worlds,
       "timestamp": timestamp.isoformat()
     })
 
@@ -753,15 +762,17 @@ async def worlds_endpoint(websocket: WebSocket):
       message = await websocket.receive_text()
       data = json.loads(message)
       if data.get("type") == "get_worlds":
-        # Use cached worlds data if available
-        cache_result = podman_manager.command_cache.get_with_timestamp("worlds")
-        if cache_result:
-          data, timestamp = cache_result
+        # Check if we have valid cached parsed worlds data
+        if (parsed_worlds_cache["timestamp"] and
+                parsed_worlds_cache["data"] and
+                (datetime.now() - parsed_worlds_cache["timestamp"]).total_seconds() <
+                parsed_worlds_cache["cache_duration"]):
+
           await safe_send_json(websocket, {
             "type": "worlds_update",
-            "output": data,
+            "worlds_data": parsed_worlds_cache["data"],
             "cached": True,
-            "timestamp": timestamp.isoformat()
+            "timestamp": parsed_worlds_cache["timestamp"].isoformat()
           })
         else:
           await handle_worlds(websocket)

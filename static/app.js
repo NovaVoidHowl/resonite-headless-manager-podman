@@ -89,7 +89,9 @@ function connect() {
   wsWorlds.onmessage = function(event) {
     const data = JSON.parse(event.data);
     if (data.type === 'worlds_update') {
-      updateWorlds(data.output, data.timestamp, data.cached);
+      // Handle both old format (output) and new format (worlds_data)
+      const worldsData = data.worlds_data || data.output;
+      updateWorlds(worldsData, data.timestamp, data.cached);
     } else if (data.type === 'error') {
       showError(data.message);
     }
@@ -357,28 +359,39 @@ function updateWorlds(worlds, timestamp, cached = false) {
       worldDiv.classList.add('cached-data');
     }
     
-    // Create world header
+    // Create world header - handle both old and new data structure
     const worldHeader = document.createElement('div');
     worldHeader.className = 'world-header';
+    
+    // Handle both old format and new structured format
+    const users = world.user_count ? world.user_count.connected_to_instance : world.users;
+    const present = world.user_count ? world.user_count.present : world.present;
+    const maxUsers = world.user_count ? world.user_count.max_users : world.maxUsers;
+    
     worldHeader.innerHTML = `
       <div class="world-title">
         <h3>${world.name || 'Unnamed World'}</h3>
         <span class="session-id" title="Session ID: ${world.sessionId}">${world.sessionId}</span>
       </div>
       <div class="world-stats">
-        <span class="users-count">${world.users}/${world.maxUsers} users</span>
+        <span class="users-count">${users}/${maxUsers} users</span>
         <span class="uptime">${world.uptime || 'Unknown'}</span>
       </div>
     `;
     
-    // Create world details
+    // Create world details - handle both old and new data structure
     const worldDetails = document.createElement('div');
     worldDetails.className = 'world-details';
+    
+    // Handle both old format and new structured format
+    const accessLevel = world.access_level || world.accessLevel;
+    const mobileFriendly = world.mobile_friendly !== undefined ? world.mobile_friendly : world.mobileFriendly;
+    
     worldDetails.innerHTML = `
       <div class="world-info">
         <div class="info-row">
           <span class="label">Access Level:</span>
-          <span class="value">${world.accessLevel}</span>
+          <span class="value">${accessLevel}</span>
         </div>
         <div class="info-row">
           <span class="label">Hidden:</span>
@@ -386,14 +399,14 @@ function updateWorlds(worlds, timestamp, cached = false) {
         </div>
         <div class="info-row">
           <span class="label">Mobile Friendly:</span>
-          <span class="value">${world.mobileFriendly ? 'Yes' : 'No'}</span>
+          <span class="value">${mobileFriendly ? 'Yes' : 'No'}</span>
         </div>
         ${world.description ? `<div class="info-row"><span class="label">Description:</span><span class="value">${world.description}</span></div>` : ''}
         ${world.tags ? `<div class="info-row"><span class="label">Tags:</span><span class="value">${world.tags}</span></div>` : ''}
       </div>
       <div class="world-actions">
         <button onclick="selectWorld(${index})" class="select-world-btn">Select World</button>
-        <button onclick="showWorldUsers(${index})" class="show-users-btn">Show Users (${world.present})</button>
+        <button onclick="showWorldUsers(${index})" class="show-users-btn">Show Users (${present})</button>
       </div>
     `;
     

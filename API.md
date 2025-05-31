@@ -178,17 +178,20 @@ Response to worlds request:
 ```json
 {
   "type": "worlds_update",
-  "output": [
+  "worlds_data": [
     {
+      "id": 0,
       "name": "World Name",
       "sessionId": "S-xxx",
-      "users": 2,
-      "present": 2,
-      "maxUsers": 10,
+      "user_count": {
+        "present": 2,
+        "connected_to_instance": 2,
+        "max_users": 10
+      },
+      "access_level": "Anyone",
       "uptime": "2 hours 30 minutes",
-      "accessLevel": "Anyone",
       "hidden": false,
-      "mobileFriendly": true,
+      "mobile_friendly": true,
       "description": "World description",
       "tags": "tag1,tag2",
       "users_list": [
