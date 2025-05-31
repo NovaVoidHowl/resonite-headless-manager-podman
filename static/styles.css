@@ -909,7 +909,7 @@ button {
   transform: translateY(0);
 }
 
-.friend-requests-card .sidebar-header {
+.friend-requests-card .collapsible-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1048,27 +1048,53 @@ button {
   align-items: center;
 }
 
+/* Unified collapsible header styles */
+.collapsible-header {
+  color: #ffffff;
+  font-size: 1.2em;
+  font-weight: bold;
+  margin-bottom: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #3a3a3a;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  transition: all 0.2s ease;
+  font-family: 'Roboto', sans-serif;
+}
+
+.collapsible-header:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.collapsible-header.collapsed {
+  margin-bottom: 0;
+}
+
+/* Sidebar specific collapsible header styles */
+.settings-card .collapsible-header {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+}
+
+.settings-card .collapsible-header.collapsed {
+  margin-bottom: 0;
+}
+
+/* Unified collapse icon styles */
 .collapse-icon {
-  transition: transform 0.3s ease;
+  font-size: 1em;
   display: inline-block;
   width: 1em;
   height: 1em;
   text-align: center;
   line-height: 1;
-}
-
-.collapsible.collapsed .collapse-icon {
-  transform: rotate(-90deg);
-}
-
-/* Ensure container controls collapse icon maintains consistent size */
-.container-controls-title .collapse-icon {
-  font-size: inherit;
-  display: inline-block;
-  width: 1em;
-  height: 1em;
-  text-align: center;
-  line-height: 1;
+  user-select: none;
 }
 
 .card-content {
@@ -1559,24 +1585,6 @@ button {
   display: flex;
   flex-direction: column;
   min-width: 200px;
-}
-
-.container-controls-title {
-  color: #ffffff;
-  font-size: 1.2em;
-  font-weight: bold;
-  margin-bottom: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid #3a3a3a;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  transition: all 0.2s ease;
 }
 
 

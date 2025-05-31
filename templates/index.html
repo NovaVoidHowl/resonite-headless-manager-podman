@@ -49,9 +49,9 @@
       <span class="last-updated">Last updated: Never</span>
     </div>
     <div class="container-controls">
-      <button class="container-controls-title collapsible collapsed" type="button" onclick="toggleCard('container-controls')">
+      <button class="collapsible-header collapsible collapsed" type="button" onclick="toggleCard('container-controls')">
         <span>Container Controls</span>
-        <span class="collapse-icon">▼</span>
+        <span class="collapse-icon">▶</span>
       </button>
       <div class="card-content collapsed" id="container-controls">
         <div class="container-controls-buttons">
@@ -74,7 +74,7 @@
     <div class="sidebar">
       <!-- Application Settings Card -->
       <div class="settings-card">
-        <button class="sidebar-header collapsible" type="button" onclick="toggleCard('app-settings')">
+        <button class="collapsible-header collapsible" type="button" onclick="toggleCard('app-settings')">
           <span>Application Settings</span>
           <span class="collapse-icon">▼</span>
         </button>
@@ -105,7 +105,7 @@
 
       <!-- Friend Requests Card -->
       <div class="settings-card friend-requests-card">
-        <button class="sidebar-header collapsible" type="button" onclick="toggleCard('friend-requests')" onkeydown="if(event.key==='Enter'||event.key===' '){toggleCard('friend-requests');}">
+        <button class="collapsible-header collapsible" type="button" onclick="toggleCard('friend-requests')" onkeydown="if(event.key==='Enter'||event.key===' '){toggleCard('friend-requests');}">
           <span>Friend Requests</span>
           <span class="collapse-icon">▼</span>
         </button>
@@ -118,7 +118,7 @@
 
       <!-- Banned Users Card -->
       <div class="settings-card banned-users-card">
-        <button class="sidebar-header collapsible" type="button" onclick="toggleCard('banned-users')" onkeydown="if(event.key==='Enter'||event.key===' '){toggleCard('banned-users');}">
+        <button class="collapsible-header collapsible" type="button" onclick="toggleCard('banned-users')" onkeydown="if(event.key==='Enter'||event.key===' '){toggleCard('banned-users');}">
           <span>Banned Users</span>
           <span class="collapse-icon">▼</span>
         </button>

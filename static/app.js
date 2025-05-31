@@ -658,6 +658,7 @@ function toggleCard(cardId) {
   const icon = header.querySelector('.collapse-icon');
   
   cardContent.classList.toggle('collapsed');
+  header.classList.toggle('collapsed');
   
   if (cardContent.classList.contains('collapsed')) {
     icon.textContent = '▶';
