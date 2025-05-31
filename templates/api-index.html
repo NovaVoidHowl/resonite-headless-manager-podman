@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resonite Headless Manager API</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #fafafa;
+            color: #3b4151;
+            line-height: 1.5;
+        }
+
+        .header {
+            background: linear-gradient(90deg, #1f8954 0%, #17a2b8 100%);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .info-section {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .info-section h2 {
+            color: #1f8954;
+            margin-bottom: 1rem;
+            font-size: 1.8rem;
+        }
+
+        .info-section p {
+            margin-bottom: 1rem;
+            color: #666;
+        }
+
+        .endpoint-group {
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .group-header {
+            background: #f8f9fa;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .group-header h3 {
+            color: #495057;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .group-header p {
+            color: #6c757d;
+            margin: 0;
+        }
+
+        .endpoint {
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .endpoint:last-child {
+            border-bottom: none;
+        }
+
+        .endpoint-header {
+            padding: 1.5rem 2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: background-color 0.2s;
+        }
+
+        .endpoint-header:hover {
+            background-color: #f8f9fa;
+        }
+
+        .method {
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            min-width: 80px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .method.get {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .method.post {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .method.websocket {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .endpoint-path {
+            font-family: 'Courier New', monospace;
+            font-weight: 500;
+            font-size: 1.1rem;
+            flex-grow: 1;
+        }
+
+        .endpoint-summary {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .endpoint-details {
+            display: none;
+            padding: 0 2rem 2rem 2rem;
+        }
+
+        .endpoint.expanded .endpoint-details {
+            display: block;
+        }
+
+        .endpoint-details h4 {
+            color: #495057;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .endpoint-details p {
+            margin-bottom: 1rem;
+            color: #666;
+        }
+
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 1rem;
+            margin: 1rem 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            overflow-x: auto;
+        }
+
+        .parameters {
+            margin: 1rem 0;
+        }
+
+        .parameter {
+            background: #f8f9fa;
+            border-left: 4px solid #17a2b8;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .parameter-name {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .parameter-type {
+            color: #6c757d;
+            font-style: italic;
+            margin-left: 0.5rem;
+        }
+
+        .parameter-description {
+            margin-top: 0.5rem;
+            color: #666;
+        }
+
+        .responses {
+            margin: 1rem 0;
+        }
+
+        .response {
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .response-code {
+            font-weight: 600;
+            color: #28a745;
+        }
+
+        .response-description {
+            margin-top: 0.5rem;
+            color: #666;
+        }
+
+        .toggle-icon {
+            margin-left: auto;
+            transition: transform 0.2s;
+        }
+
+        .endpoint.expanded .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .websocket-info {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .websocket-info h5 {
+            color: #856404;
+            margin-bottom: 0.5rem;
+        }
+
+        .websocket-info p {
+            color: #856404;
+            margin: 0;
+        }
+
+        .try-it-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 2rem;
+            margin-top: 2rem;
+        }
+
+        .try-it-section h3 {
+            color: #495057;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .btn {
+            background: #1f8954;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background: #198754;
+        }
+
+        .response-output {
+            background: #212529;
+            color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            margin-top: 1rem;
+            min-height: 100px;
+            white-space: pre-wrap;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .endpoint-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            
+            .endpoint-path {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Resonite Headless Manager API</h1>
+        <p>WebSocket and REST API for managing Resonite headless servers</p>
+    </div>
+
+    <div class="container">
+        <div class="info-section">
+            <h2>API Information</h2>
+            <p><strong>Version:</strong> 1.0.0</p>
+            <p><strong>Base URL:</strong> <code>http://your-server-ip:8000</code></p>
+            <p><strong>WebSocket URL:</strong> <code>ws://your-server-ip:8000</code></p>
+            <p>This API provides comprehensive management capabilities for Resonite headless servers including real-time monitoring, configuration management, and world control.</p>
+        </div>
+
+        <!-- WebSocket Endpoints -->
+        <div class="endpoint-group">
+            <div class="group-header">
+                <h3>WebSocket Endpoints</h3>
+                <p>Real-time communication endpoints for monitoring and control</p>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method websocket">WS</span>
+                    <span class="endpoint-path">/ws/command</span>
+                    <span class="endpoint-summary">Send commands to the server</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Send commands to the headless server and receive structured responses.</p>
+                    
+                    <h4>Message Format</h4>
+                    <div class="code-block">{
+  "type": "command",
+  "command": "command_string"
+}</div>
+
+                    <h4>Special Commands</h4>
+                    <div class="parameters">
+                        <div class="parameter">
+                            <span class="parameter-name">listbans</span>
+                            <div class="parameter-description">Returns a structured list of banned users</div>
+                        </div>
+                        <div class="parameter">
+                            <span class="parameter-name">friendRequests</span>
+                            <div class="parameter-description">Returns a list of pending friend requests</div>
+                        </div>
+                        <div class="parameter">
+                            <span class="parameter-name">worlds</span>
+                            <div class="parameter-description">Returns information about all running worlds</div>
+                        </div>
+                        <div class="parameter">
+                            <span class="parameter-name">status</span>
+                            <div class="parameter-description">Returns current server status</div>
+                        </div>
+                        <div class="parameter">
+                            <span class="parameter-name">users</span>
+                            <div class="parameter-description">Returns list of users</div>
+                        </div>
+                    </div>
+
+                    <h4>Response Example</h4>
+                    <div class="code-block">{
+  "type": "command_response",
+  "command": "status",
+  "output": "Server running normally",
+  "timestamp": "2025-05-31T12:34:56.789Z"
+}</div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method websocket">WS</span>
+                    <span class="endpoint-path">/ws/worlds</span>
+                    <span class="endpoint-summary">Monitor world information</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Real-time updates about world status, users, and properties.</p>
+                    
+                    <h4>Request Message</h4>
+                    <div class="code-block">{
+  "type": "get_worlds"
+}</div>
+
+                    <h4>Response Example</h4>
+                    <div class="code-block">{
+  "type": "worlds_update",
+  "output": [
+    {
+      "name": "World Name",
+      "sessionId": "S-xxx",
+      "users": 2,
+      "present": 2,
+      "maxUsers": 10,
+      "uptime": "2 hours 30 minutes",
+      "accessLevel": "Anyone",
+      "hidden": false,
+      "mobileFriendly": true,
+      "description": "World description",
+      "tags": "tag1,tag2",
+      "users_list": [
+        {
+          "username": "User1",
+          "id": "U-xxx",
+          "role": "User",
+          "present": true,
+          "ping": 50,
+          "fps": 72.5,
+          "silenced": false
+        }
+      ]
+    }
+  ],
+  "timestamp": "2025-05-31T12:34:56.789Z"
+}</div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method websocket">WS</span>
+                    <span class="endpoint-path">/ws/logs</span>
+                    <span class="endpoint-summary">Stream container logs</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Real-time streaming of container logs. Automatically sends recent logs on connection and streams new logs.</p>
+                    
+                    <div class="websocket-info">
+                        <h5>Auto-streaming</h5>
+                        <p>This endpoint automatically streams log updates. No request message needed.</p>
+                    </div>
+
+                    <h4>Response Example</h4>
+                    <div class="code-block">{
+  "type": "container_output",
+  "output": "Server log message",
+  "timestamp": "2025-05-31T12:34:56.789Z"
+}</div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method websocket">WS</span>
+                    <span class="endpoint-path">/ws/cpu</span>
+                    <span class="endpoint-summary">Monitor CPU usage</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Real-time CPU usage monitoring with updates every second.</p>
+                    
+                    <div class="websocket-info">
+                        <h5>Auto-streaming</h5>
+                        <p>This endpoint automatically streams CPU usage updates every second.</p>
+                    </div>
+
+                    <h4>Response Example</h4>
+                    <div class="code-block">{
+  "type": "cpu_update",
+  "cpu_usage": 5.2
+}</div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method websocket">WS</span>
+                    <span class="endpoint-path">/ws/memory</span>
+                    <span class="endpoint-summary">Monitor memory usage</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Real-time memory usage monitoring with updates every second.</p>
+                    
+                    <div class="websocket-info">
+                        <h5>Auto-streaming</h5>
+                        <p>This endpoint automatically streams memory usage updates every second.</p>
+                    </div>
+
+                    <h4>Response Example</h4>
+                    <div class="code-block">{
+  "type": "memory_update",
+  "memory_percent": 45.3,
+  "memory_used": "4.2GB",
+  "memory_total": "16.0GB"
+}</div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method websocket">WS</span>
+                    <span class="endpoint-path">/ws/container_status</span>
+                    <span class="endpoint-summary">Monitor container status</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Get container status information on demand.</p>
+                    
+                    <h4>Request Message</h4>
+                    <div class="code-block">{
+  "type": "get_container_status"
+}</div>
+
+                    <h4>Response Example</h4>
+                    <div class="code-block">{
+  "type": "container_status_update",
+  "status": {
+    "status": "running",
+    "name": "container_name",
+    "id": "container_id",
+    "image": "container_image"
+  }
+}</div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method websocket">WS</span>
+                    <span class="endpoint-path">/ws/heartbeat</span>
+                    <span class="endpoint-summary">Heartbeat connection</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Heartbeat connection to keep other WebSocket connections alive.</p>
+                    
+                    <div class="websocket-info">
+                        <h5>Connection maintenance</h5>
+                        <p>This endpoint is used internally to maintain connection state.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method websocket">WS</span>
+                    <span class="endpoint-path">/ws/status</span>
+                    <span class="endpoint-summary">Status monitoring and updates</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Monitor server status and receive real-time updates.</p>
+                    
+                    <h4>Request Message</h4>
+                    <div class="code-block">{
+  "type": "get_status"
+}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- REST API Endpoints -->
+        <div class="endpoint-group">
+            <div class="group-header">
+                <h3>REST API Endpoints</h3>
+                <p>HTTP endpoints for configuration and container management</p>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/</span>
+                    <span class="endpoint-summary">Serve main web interface</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Returns the main web interface HTML page.</p>
+                    
+                    <div class="responses">
+                        <div class="response">
+                            <span class="response-code">200 OK</span>
+                            <div class="response-description">HTML page content</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/config</span>
+                    <span class="endpoint-summary">Get headless server configuration</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Retrieve the current headless server configuration.</p>
+                    
+                    <div class="responses">
+                        <div class="response">
+                            <span class="response-code">200 OK</span>
+                            <div class="response-description">Configuration data in JSON format</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/config</span>
+                    <span class="endpoint-summary">Update headless server configuration</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Update the headless server configuration with new settings.</p>
+                    
+                    <h4>Request Body</h4>
+                    <div class="code-block">{
+  "configProperty": "value",
+  "anotherProperty": "anotherValue"
+}</div>
+
+                    <div class="responses">
+                        <div class="response">
+                            <span class="response-code">200 OK</span>
+                            <div class="response-description">Configuration updated successfully</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/api/config/status</span>
+                    <span class="endpoint-summary">Check configuration file status</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Check if the system is using a config file or built-in settings.</p>
+                    
+                    <h4>Response Example</h4>
+                    <div class="code-block">{
+  "using_config_file": true
+}</div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <span class="endpoint-path">/api/config/settings</span>
+                    <span class="endpoint-summary">Get current configuration settings</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Retrieve current configuration settings including cache intervals.</p>
+                    
+                    <h4>Response Example</h4>
+                    <div class="code-block">{
+  "using_config_file": true,
+  "config_file_path": "config.json",
+  "settings": {
+    "cache": {
+      "worlds_interval": 10,
+      "status_interval": 10,
+      "sessionurl_interval": 30,
+      "sessionid_interval": 30,
+      "users_interval": 5,
+      "listbans_interval": 60
+    }
+  }
+}</div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/api/config/generate</span>
+                    <span class="endpoint-summary">Generate config file</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Generate a new config.json file if it doesn't exist.</p>
+                    
+                    <h4>Response Examples</h4>
+                    <div class="code-block">{
+  "status": "created",
+  "message": "Generated new config file at config.json"
+}</div>
+                    
+                    <div class="code-block">{
+  "status": "unchanged",
+  "message": "Config file already exists and is being used"
+}</div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/api/world-properties</span>
+                    <span class="endpoint-summary">Update world properties</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Update properties for a specific world. Requires session ID.</p>
+                    
+                    <h4>Request Body</h4>
+                    <div class="code-block">{
+  "sessionId": "S-xxx",
+  "properties": {
+    "name": "New World Name",
+    "description": "Updated description",
+    "maxUsers": 20
+  }
+}</div>
+
+                    <div class="responses">
+                        <div class="response">
+                            <span class="response-code">200 OK</span>
+                            <div class="response-description">World properties updated successfully</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/api/start-container</span>
+                    <span class="endpoint-summary">Start the container</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Start the Resonite headless container.</p>
+                    
+                    <div class="responses">
+                        <div class="response">
+                            <span class="response-code">200 OK</span>
+                            <div class="response-description">Container started successfully</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/api/stop-container</span>
+                    <span class="endpoint-summary">Stop the container</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Stop the Resonite headless container.</p>
+                    
+                    <div class="responses">
+                        <div class="response">
+                            <span class="response-code">200 OK</span>
+                            <div class="response-description">Container stopped successfully</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method post">POST</span>
+                    <span class="endpoint-path">/api/restart-container</span>
+                    <span class="endpoint-summary">Restart the container</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>Restart the Resonite headless container.</p>
+                    
+                    <div class="responses">
+                        <div class="response">
+                            <span class="response-code">200 OK</span>
+                            <div class="response-description">Container restarted successfully</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Try It Out Section -->
+        <div class="try-it-section">
+            <h3>Try It Out</h3>
+            <p>Test the API endpoints directly from this interface.</p>
+            
+            <div class="form-group">
+                <label for="endpoint-select">Select Endpoint:</label>
+                <select id="endpoint-select" onchange="updateTryItForm()">
+                    <option value="">Select an endpoint...</option>
+                    <option value="GET:/api/config/status">GET /api/config/status</option>
+                    <option value="GET:/api/config/settings">GET /api/config/settings</option>
+                    <option value="POST:/api/config/generate">POST /api/config/generate</option>
+                    <option value="POST:/api/start-container">POST /api/start-container</option>
+                    <option value="POST:/api/stop-container">POST /api/stop-container</option>
+                    <option value="POST:/api/restart-container">POST /api/restart-container</option>
+                </select>
+            </div>
+            
+            <div class="form-group" id="request-body-group" style="display: none;">
+                <label for="request-body">Request Body (JSON):</label>
+                <textarea id="request-body" rows="6" placeholder="Enter JSON request body..."></textarea>
+            </div>
+            
+            <button class="btn" onclick="makeRequest()">Send Request</button>
+            
+            <div class="response-output" id="response-output">Response will appear here...</div>
+        </div>
+
+        <!-- WebSocket Testing Section -->
+        <div class="try-it-section">
+            <h3>WebSocket Testing</h3>
+            <p>Test WebSocket connections and send messages.</p>
+            
+            <div class="form-group">
+                <label for="ws-endpoint">WebSocket Endpoint:</label>
+                <select id="ws-endpoint">
+                    <option value="/ws/command">Command</option>
+                    <option value="/ws/worlds">Worlds</option>
+                    <option value="/ws/logs">Logs</option>
+                    <option value="/ws/cpu">CPU</option>
+                    <option value="/ws/memory">Memory</option>
+                    <option value="/ws/container_status">Container Status</option>
+                    <option value="/ws/status">Status</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="ws-message">Message (JSON):</label>
+                <textarea id="ws-message" rows="4" placeholder='{"type": "command", "command": "status"}'></textarea>
+            </div>
+            
+            <button class="btn" onclick="connectWebSocket()" id="ws-connect-btn">Connect</button>
+            <button class="btn" onclick="sendWebSocketMessage()" id="ws-send-btn" disabled>Send Message</button>
+            <button class="btn" onclick="disconnectWebSocket()" id="ws-disconnect-btn" disabled>Disconnect</button>
+            
+            <div class="response-output" id="ws-output">WebSocket messages will appear here...</div>
+        </div>
+    </div>
+
+    <script>
+        let currentWebSocket = null;
+
+        function toggleEndpoint(element) {
+            element.classList.toggle('expanded');
+        }
+
+        function updateTryItForm() {
+            const select = document.getElementById('endpoint-select');
+            const requestBodyGroup = document.getElementById('request-body-group');
+            const requestBody = document.getElementById('request-body');
+            
+            if (select.value.startsWith('POST:')) {
+                requestBodyGroup.style.display = 'block';
+                
+                // Set example request bodies for different endpoints
+                if (select.value === 'POST:/api/world-properties') {
+                    requestBody.value = JSON.stringify({
+                        sessionId: "S-xxx",
+                        properties: {
+                            name: "New World Name",
+                            description: "Updated description",
+                            maxUsers: 20
+                        }
+                    }, null, 2);
+                } else if (select.value === 'POST:/config') {
+                    requestBody.value = JSON.stringify({
+                        configProperty: "value",
+                        anotherProperty: "anotherValue"
+                    }, null, 2);
+                } else {
+                    requestBody.value = '';
+                }
+            } else {
+                requestBodyGroup.style.display = 'none';
+            }
+        }
+
+        async function makeRequest() {
+            const select = document.getElementById('endpoint-select');
+            const requestBody = document.getElementById('request-body');
+            const output = document.getElementById('response-output');
+            
+            if (!select.value) {
+                output.textContent = 'Please select an endpoint';
+                return;
+            }
+            
+            const [method, path] = select.value.split(':');
+            const url = window.location.origin + path;
+            
+            output.textContent = 'Sending request...';
+            
+            try {
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                };
+                
+                if (method === 'POST' && requestBody.value.trim()) {
+                    options.body = requestBody.value;
+                }
+                
+                const response = await fetch(url, options);
+                const data = await response.text();
+                
+                output.textContent = `Status: ${response.status}\n\n${data}`;
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        function connectWebSocket() {
+            const endpointSelect = document.getElementById('ws-endpoint');
+            const output = document.getElementById('ws-output');
+            const connectBtn = document.getElementById('ws-connect-btn');
+            const sendBtn = document.getElementById('ws-send-btn');
+            const disconnectBtn = document.getElementById('ws-disconnect-btn');
+            
+            if (currentWebSocket) {
+                output.textContent += '\nDisconnecting existing connection...\n';
+                currentWebSocket.close();
+            }
+            
+            const wsUrl = `ws://${window.location.host}${endpointSelect.value}`;
+            output.textContent = `Connecting to ${wsUrl}...\n`;
+            
+            currentWebSocket = new WebSocket(wsUrl);
+            
+            currentWebSocket.onopen = function(event) {
+                output.textContent += 'Connected!\n';
+                connectBtn.disabled = true;
+                sendBtn.disabled = false;
+                disconnectBtn.disabled = false;
+            };
+            
+            currentWebSocket.onmessage = function(event) {
+                const timestamp = new Date().toLocaleTimeString();
+                output.textContent += `[${timestamp}] Received: ${event.data}\n`;
+                output.scrollTop = output.scrollHeight;
+            };
+            
+            currentWebSocket.onclose = function(event) {
+                output.textContent += 'Connection closed\n';
+                connectBtn.disabled = false;
+                sendBtn.disabled = true;
+                disconnectBtn.disabled = true;
+                currentWebSocket = null;
+            };
+            
+            currentWebSocket.onerror = function(error) {
+                output.textContent += `Error: ${error}\n`;
+            };
+        }
+
+        function sendWebSocketMessage() {
+            const messageInput = document.getElementById('ws-message');
+            const output = document.getElementById('ws-output');
+            
+            if (!currentWebSocket || currentWebSocket.readyState !== WebSocket.OPEN) {
+                output.textContent += 'WebSocket not connected\n';
+                return;
+            }
+            
+            if (!messageInput.value.trim()) {
+                output.textContent += 'Please enter a message\n';
+                return;
+            }
+            
+            try {
+                const message = messageInput.value;
+                currentWebSocket.send(message);
+                const timestamp = new Date().toLocaleTimeString();
+                output.textContent += `[${timestamp}] Sent: ${message}\n`;
+                output.scrollTop = output.scrollHeight;
+            } catch (error) {
+                output.textContent += `Error sending message: ${error.message}\n`;
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (currentWebSocket) {
+                currentWebSocket.close();
+            }
+        }
+
+        // Auto-scroll to bottom for outputs
+        document.addEventListener('DOMContentLoaded', function() {
+            const outputs = document.querySelectorAll('.response-output');
+            outputs.forEach(output => {
+                output.addEventListener('DOMNodeInserted', function() {
+                    output.scrollTop = output.scrollHeight;
+                });
+            });
+        });
+    </script>
+</body>
+</html>

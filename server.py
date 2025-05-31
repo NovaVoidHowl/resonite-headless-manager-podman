@@ -248,7 +248,7 @@ async def get():
   Returns:
       HTMLResponse: The rendered index.html template
   """
-  with open("templates/index.html", encoding='utf-8') as f:
+  with open("templates/api-index.html", encoding='utf-8') as f:
     return HTMLResponse(f.read())
 
 
