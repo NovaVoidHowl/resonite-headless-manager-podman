@@ -326,12 +326,28 @@ function updateWorlds(worlds, timestamp, cached = false) {
   const worldsList = document.getElementById('worlds-list');
   worldsList.innerHTML = '';
   
-  if (!worlds || worlds.length === 0) {
+  // Handle different response formats and ensure worlds is an array
+  let worldsArray = [];
+  if (Array.isArray(worlds)) {
+    worldsArray = worlds;
+  } else if (worlds && typeof worlds === 'object' && Array.isArray(worlds.worlds)) {
+    worldsArray = worlds.worlds;
+  } else if (worlds && typeof worlds === 'string') {
+    try {
+      const parsed = JSON.parse(worlds);
+      worldsArray = Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.warn('Failed to parse worlds data:', worlds, error);
+      worldsArray = [];
+    }
+  }
+  
+  if (!worldsArray || worldsArray.length === 0) {
     worldsList.innerHTML = '<div class="no-worlds">No worlds running</div>';
     return;
   }
   
-  worlds.forEach((world, index) => {
+  worldsArray.forEach((world, index) => {
     const worldDiv = document.createElement('div');
     worldDiv.className = 'world-item';
     worldDiv.setAttribute('data-timestamp', new Date(timestamp).toLocaleString());
@@ -398,13 +414,29 @@ function updateFriendRequests(requests, timestamp, cached = false) {
   const requestsList = document.getElementById('friend-requests-list');
   requestsList.innerHTML = '';
   
-  if (!requests || requests.length === 0) {
+  // Handle different response formats and ensure requests is an array
+  let requestsArray = [];
+  if (Array.isArray(requests)) {
+    requestsArray = requests;
+  } else if (requests && typeof requests === 'object' && Array.isArray(requests.requests)) {
+    requestsArray = requests.requests;
+  } else if (requests && typeof requests === 'string') {
+    try {
+      const parsed = JSON.parse(requests);
+      requestsArray = Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.warn('Failed to parse friend requests data:', requests, error);
+      requestsArray = [];
+    }
+  }
+  
+  if (!requestsArray || requestsArray.length === 0) {
     requestsList.innerHTML = '<div class="no-requests">No pending friend requests</div>';
     return;
   }
   
   // Filter out denied requests
-  const filteredRequests = requests.filter(request => 
+  const filteredRequests = requestsArray.filter(request => 
     !deniedFriendRequests.has(request.id || request.username)
   );
   
@@ -441,12 +473,28 @@ function updateBannedUsers(bans, timestamp, cached = false) {
   const bansList = document.getElementById('banned-users-list');
   bansList.innerHTML = '';
   
-  if (!bans || bans.length === 0) {
+  // Handle different response formats and ensure bans is an array
+  let bansArray = [];
+  if (Array.isArray(bans)) {
+    bansArray = bans;
+  } else if (bans && typeof bans === 'object' && Array.isArray(bans.bans)) {
+    bansArray = bans.bans;
+  } else if (bans && typeof bans === 'string') {
+    try {
+      const parsed = JSON.parse(bans);
+      bansArray = Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.warn('Failed to parse banned users data:', bans, error);
+      bansArray = [];
+    }
+  }
+  
+  if (!bansArray || bansArray.length === 0) {
     bansList.innerHTML = '<div class="no-bans">No banned users</div>';
     return;
   }
   
-  bans.forEach(ban => {
+  bansArray.forEach(ban => {
     const banDiv = document.createElement('div');
     banDiv.className = 'ban-item';
     banDiv.setAttribute('data-timestamp', new Date(timestamp).toLocaleString());
@@ -684,12 +732,28 @@ function updateConnectedUsers(users, timestamp, cached = false) {
   const usersList = document.getElementById('connected-users-list');
   usersList.innerHTML = '';
   
-  if (!users || users.length === 0) {
+  // Handle different response formats and ensure users is an array
+  let usersArray = [];
+  if (Array.isArray(users)) {
+    usersArray = users;
+  } else if (users && typeof users === 'object' && Array.isArray(users.users)) {
+    usersArray = users.users;
+  } else if (users && typeof users === 'string') {
+    try {
+      const parsed = JSON.parse(users);
+      usersArray = Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.warn('Failed to parse users data:', users, error);
+      usersArray = [];
+    }
+  }
+  
+  if (!usersArray || usersArray.length === 0) {
     usersList.innerHTML = '<div class="no-users">No users connected</div>';
     return;
   }
   
-  users.forEach(user => {
+  usersArray.forEach(user => {
     const userDiv = document.createElement('div');
     userDiv.className = 'user-item';
     userDiv.setAttribute('data-timestamp', new Date(timestamp).toLocaleString());
