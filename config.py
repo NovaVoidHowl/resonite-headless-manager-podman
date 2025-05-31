@@ -89,3 +89,31 @@ class Config:
         "invalidate_on_commands": ["ban", "unban"]
       }
     }
+
+  def is_using_config_file(self) -> bool:
+    """Check if using config file or builtin defaults"""
+    return os.path.exists(self.config_file)
+
+  def get_current_settings(self) -> Dict:
+    """Get current configuration settings"""
+    return {
+      "using_config_file": self.is_using_config_file(),
+      "config_file_path": self.config_file if self.is_using_config_file() else None,
+      "settings": {
+        "cache": asdict(self.cache_config)
+      }
+    }
+
+  def generate_config_file(self) -> Dict[str, str]:
+    """Generate config file if not exists and return status"""
+    if self.is_using_config_file():
+      return {
+        "status": "unchanged",
+        "message": "Config file already exists and is being used"
+      }
+    
+    self.save_config()
+    return {
+      "status": "created",
+      "message": f"Generated new config file at {self.config_file}"
+    }

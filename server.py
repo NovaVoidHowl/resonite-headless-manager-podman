@@ -1025,6 +1025,41 @@ async def stop_container():
     raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.get("/api/config/status")
+async def get_config_status():
+  """Get whether the app is using builtin or config file settings"""
+  try:
+    result = {
+      "using_config_file": podman_manager.config.is_using_config_file()
+    }
+    return JSONResponse(content=result)
+  except Exception as e:
+    logger.error("Error in get_config_status endpoint: %s", str(e))
+    raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/config/settings")
+async def get_config_settings():
+  """Get current configuration settings"""
+  try:
+    result = podman_manager.config.get_current_settings()
+    return JSONResponse(content=result)
+  except Exception as e:
+    logger.error("Error in get_config_settings endpoint: %s", str(e))
+    raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/config/generate")
+async def generate_config():
+  """Generate config file and switch to using it"""
+  try:
+    result = podman_manager.config.generate_config_file()
+    return JSONResponse(content=result)
+  except Exception as e:
+    logger.error("Error generating config file: %s", str(e))
+    raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @app.on_event("shutdown")
 async def shutdown_event():
   """Clean up resources when server shuts down"""
