@@ -170,6 +170,28 @@ class CommandCache:
 
     return cache_entry.data
 
+  def get_with_timestamp(self, command: str, max_age: Optional[int] = None) -> Optional[tuple[Any, datetime]]:
+    """
+    Get cached result with its timestamp.
+
+    Args:
+      command (str): The command to get results for
+      max_age (Optional[int]): Maximum age of cache in seconds
+
+    Returns:
+      Optional[tuple[Any, datetime]]: Tuple of (cached result, last_updated timestamp) or None if not cached
+    """
+    if command not in self._cache:
+      return None
+
+    cache_entry = self._cache[command]
+    age = (datetime.now() - cache_entry.timestamp).total_seconds()
+
+    if max_age and age > max_age:
+      return None
+
+    return (cache_entry.data, cache_entry.last_updated)
+
   def get_status(self) -> Dict[str, Any]:
     """
     Get status information about the cache.

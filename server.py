@@ -19,7 +19,7 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, Set
+from typing import Any, Dict, Optional, Set
 
 import psutil
 from dotenv import load_dotenv
@@ -316,13 +316,19 @@ def parse_user_data(line: str) -> dict | None:
   return None
 
 
-async def handle_specific_command(websocket: WebSocket, command: str, output: str):
+async def handle_specific_command(
+    websocket: WebSocket,
+    command: str,
+    output: str,
+    timestamp: Optional[datetime] = None
+):
   """Handle specific command types with structured responses"""
   if command == "listbans":
     bans = parse_bans(output) if output.strip() else []
     await safe_send_json(websocket, {
       "type": "bans_update",
-      "bans": bans
+      "bans": bans,
+      "timestamp": timestamp.isoformat() if timestamp else datetime.now().isoformat()
     })
     return True
 
@@ -331,7 +337,8 @@ async def handle_specific_command(websocket: WebSocket, command: str, output: st
     await safe_send_json(websocket, {
       "type": "command_response",
       "command": command,
-      "output": requests
+      "output": requests,
+      "timestamp": timestamp.isoformat() if timestamp else datetime.now().isoformat()
     })
     return True
 
@@ -345,7 +352,8 @@ async def handle_specific_command(websocket: WebSocket, command: str, output: st
     await safe_send_json(websocket, {
       "type": "command_response",
       "command": command,
-      "output": users
+      "output": users,
+      "timestamp": timestamp.isoformat() if timestamp else datetime.now().isoformat()
     })
     return True
 
@@ -373,8 +381,15 @@ async def handle_command(websocket: WebSocket, command: str):
     if command in ["ban", "unban"]:
       podman_manager.command_cache.invalidate("listbans")
 
+    # Get timestamp from cache if this was a cached command
+    timestamp = None
+    if use_cache:
+      cache_result = podman_manager.command_cache.get_with_timestamp(command)
+      if cache_result:
+        _, timestamp = cache_result
+
     # Try to handle as a specific command type
-    if not await handle_specific_command(websocket, command, output):
+    if not await handle_specific_command(websocket, command, output, timestamp):
       # If not a specific command, return raw output
       await safe_send_json(websocket, {
         "type": "command_response",
@@ -390,7 +405,7 @@ async def handle_status(websocket: WebSocket):
     status_dict = dict(status)
 
     if podman_manager.is_container_running():
-      status_output = podman_manager.send_command("status")
+      status_output = podman_manager.send_command("status", use_cache=True)
       for line in [
         status_line.strip()
         for status_line in status_output.split('\n')
@@ -404,10 +419,16 @@ async def handle_status(websocket: WebSocket):
       status_dict['status'] = 'stopped'
       status_dict['error_message'] = status_dict['error']
 
+    # Get timestamp from cache if available
+    timestamp = datetime.now()
+    cache_result = podman_manager.command_cache.get_with_timestamp("status")
+    if cache_result:
+      _, timestamp = cache_result
+
     await safe_send_json(websocket, {
       "type": "status_update",
       "status": status_dict,
-      "timestamp": datetime.now().isoformat()
+      "timestamp": timestamp.isoformat()
     })
   except (ConnectionError, RuntimeError) as e:
     logger.error("Error in handle_status: %s", str(e))
@@ -579,11 +600,17 @@ async def handle_worlds(websocket: WebSocket):
       except (ValueError, KeyError, ConnectionError, RuntimeError) as e:
         logger.error("Error processing world %d: %s", i, str(e))
 
+    # Get data and timestamp from cache if available
+    cache_result = podman_manager.command_cache.get_with_timestamp("worlds")
+    timestamp = datetime.now()
+    if cache_result:
+      _, timestamp = cache_result
+
     logger.info("Sending %d world(s) to client", len(worlds))
     await safe_send_json(websocket, {
       "type": "worlds_update",
       "output": worlds,
-      "timestamp": datetime.now().isoformat()
+      "timestamp": timestamp.isoformat()
     })
 
 
@@ -727,12 +754,14 @@ async def worlds_endpoint(websocket: WebSocket):
       data = json.loads(message)
       if data.get("type") == "get_worlds":
         # Use cached worlds data if available
-        cached_worlds = podman_manager.command_cache.get("worlds")
-        if cached_worlds:
+        cache_result = podman_manager.command_cache.get_with_timestamp("worlds")
+        if cache_result:
+          data, timestamp = cache_result
           await safe_send_json(websocket, {
             "type": "worlds_update",
-            "output": cached_worlds,
-            "cached": True
+            "output": data,
+            "cached": True,
+            "timestamp": timestamp.isoformat()
           })
         else:
           await handle_worlds(websocket)
