@@ -1538,7 +1538,9 @@ button {
 .container-controls {
   background: #2a2a2a;
   border-radius: 8px;
-  padding: 16px;
+  padding-left: 16px;
+  padding-right: 16px;
+  margin-left: 10px;
   display: flex;
   flex-direction: column;
   min-width: 200px;
