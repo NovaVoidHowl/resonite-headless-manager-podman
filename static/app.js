@@ -73,7 +73,7 @@ function connect() {
   wsWorlds.onmessage = function(event) {
     const data = JSON.parse(event.data);
     if (data.type === 'worlds_update') {
-      updateWorlds(data.output);
+      updateWorlds(data.output, data.timestamp);
     } else if (data.type === 'error') {
       showError(data.message);
     }
@@ -86,11 +86,11 @@ function connect() {
     const data = JSON.parse(event.data);
     if (data.type === 'command_response') {
       if (data.command === 'friendRequests') {
-        updateFriendRequests(data.output);
+        updateFriendRequests(data.output, data.timestamp);
       }
-      console.log('command_response', data.output);
+      console.log('command_response', data.output, data.timestamp);
     } else if (data.type === 'bans_update') {
-      updateBannedUsers(data.bans);
+      updateBannedUsers(data.bans, data.timestamp);
     } else if (data.type === 'error') {
       showError(data.message);
     }
@@ -234,7 +234,7 @@ function appendOutput(text, className = '', timestamp = null) {
   // Add timestamp if provided
   if (timestamp) {
     const time = new Date(timestamp);
-    const timeString = time.toLocaleTimeString();
+    const timeString = time.toLocaleString();
     div.setAttribute('data-timestamp', timeString);
     div.className += ' log-line';
   }
@@ -247,6 +247,42 @@ function appendOutput(text, className = '', timestamp = null) {
   }
   
   output.scrollTop = output.scrollHeight;
+}
+
+function updateWorlds(worlds, timestamp) {
+  // Update worlds list with timestamp
+  const worldsList = document.getElementById('worlds-list');
+  worldsList.innerHTML = '';
+  worlds.forEach(world => {
+    const worldDiv = document.createElement('div');
+    worldDiv.className = 'world-item';
+    worldDiv.setAttribute('data-timestamp', new Date(timestamp).toLocaleString());
+    // ... rest of world item creation
+  });
+}
+
+function updateFriendRequests(requests, timestamp) {
+  // Update friend requests with timestamp
+  const requestsList = document.getElementById('friend-requests-list');
+  requestsList.innerHTML = '';
+  requests.forEach(request => {
+    const requestDiv = document.createElement('div');
+    requestDiv.className = 'friend-request';
+    requestDiv.setAttribute('data-timestamp', new Date(timestamp).toLocaleString());
+    // ... rest of friend request item creation
+  });
+}
+
+function updateBannedUsers(bans, timestamp) {
+  // Update banned users list with timestamp
+  const bansList = document.getElementById('bans-list');
+  bansList.innerHTML = '';
+  bans.forEach(ban => {
+    const banDiv = document.createElement('div');
+    banDiv.className = 'ban-item';
+    banDiv.setAttribute('data-timestamp', new Date(timestamp).toLocaleString());
+    // ... rest of ban item creation
+  });
 }
 
 // Container control functions

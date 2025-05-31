@@ -94,7 +94,8 @@ The server sends different types of responses based on the request:
 {
   "type": "command_response",
   "command": "original_command",
-  "output": "command_output"
+  "output": "command_output",
+  "timestamp": "2025-05-31T12:34:56.789Z"
 }
 ```
 
@@ -110,7 +111,8 @@ Response to `listbans` command:
       "username": "banned_user",
       "userId": "U-xxx"
     }
-  ]
+  ],
+  "timestamp": "2025-05-31T12:34:56.789Z"
 }
 ```
 
@@ -121,7 +123,8 @@ Automatic updates from the CPU endpoint:
 ```json
 {
   "type": "cpu_update",
-  "cpu_usage": 5.2
+  "cpu_usage": 5.2,
+  "timestamp": "2025-05-31T12:34:56.789Z"
 }
 ```
 
@@ -134,7 +137,8 @@ Automatic updates from the memory endpoint:
   "type": "memory_update",
   "memory_percent": 45.3,
   "memory_used": "4.2GB",
-  "memory_total": "16.0GB"
+  "memory_total": "16.0GB",
+  "timestamp": "2025-05-31T12:34:56.789Z"
 }
 ```
 
@@ -150,7 +154,8 @@ Response to container status request:
     "name": "container_name",
     "id": "container_id",
     "image": "container_image"
-  }
+  },
+  "timestamp": "2025-05-31T12:34:56.789Z"
 }
 ```
 
@@ -185,7 +190,8 @@ Response to worlds request:
         }
       ]
     }
-  ]
+  ],
+  "timestamp": "2025-05-31T12:34:56.789Z"
 }
 ```
 

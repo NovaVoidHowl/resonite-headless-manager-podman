@@ -356,7 +356,10 @@ async def handle_command(websocket: WebSocket, command: str):
   """Handle command execution and response"""
   async with request_locks['command']:
     logger.info("Executing command: %s", command)
-    output = podman_manager.send_command(command)
+
+    # Check if command should use cache
+    use_cache = command in ["worlds", "status", "sessionUrl", "sessionID", "users", "listbans"]
+    output = podman_manager.send_command(command, use_cache=use_cache)
     logger.info("Raw command output: %s", output)
 
     if output.startswith("Error: Container is not running"):
@@ -365,6 +368,10 @@ async def handle_command(websocket: WebSocket, command: str):
         "message": "Container is not running. Please start the container first."
       })
       return
+
+    # If this is a command that invalidates cache for others, handle it
+    if command in ["ban", "unban"]:
+      podman_manager.command_cache.invalidate("listbans")
 
     # Try to handle as a specific command type
     if not await handle_specific_command(websocket, command, output):
@@ -399,7 +406,8 @@ async def handle_status(websocket: WebSocket):
 
     await safe_send_json(websocket, {
       "type": "status_update",
-      "status": status_dict
+      "status": status_dict,
+      "timestamp": datetime.now().isoformat()
     })
   except (ConnectionError, RuntimeError) as e:
     logger.error("Error in handle_status: %s", str(e))
@@ -542,7 +550,8 @@ async def handle_worlds(websocket: WebSocket):
       await safe_send_json(websocket, {
         "type": "worlds_update",
         "output": [],
-        "error": "Container is not running. Please start the container first."
+        "error": "Container is not running. Please start the container first.",
+        "timestamp": datetime.now().isoformat()
       })
       return
 
@@ -573,7 +582,8 @@ async def handle_worlds(websocket: WebSocket):
     logger.info("Sending %d world(s) to client", len(worlds))
     await safe_send_json(websocket, {
       "type": "worlds_update",
-      "output": worlds
+      "output": worlds,
+      "timestamp": datetime.now().isoformat()
     })
 
 
@@ -716,7 +726,16 @@ async def worlds_endpoint(websocket: WebSocket):
       message = await websocket.receive_text()
       data = json.loads(message)
       if data.get("type") == "get_worlds":
-        await handle_worlds(websocket)
+        # Use cached worlds data if available
+        cached_worlds = podman_manager.command_cache.get("worlds")
+        if cached_worlds:
+          await safe_send_json(websocket, {
+            "type": "worlds_update",
+            "output": cached_worlds,
+            "cached": True
+          })
+        else:
+          await handle_worlds(websocket)
 
   except WebSocketDisconnect:
     logger.info("Worlds WebSocket disconnected normally")
@@ -847,6 +866,9 @@ async def safe_send_json(websocket: WebSocket, data: dict) -> bool:
   """Safely send JSON data over websocket with state checking"""
   try:
     if await is_websocket_connected(websocket):
+      # Add timestamp if not already present
+      if "timestamp" not in data:
+        data["timestamp"] = datetime.now().isoformat()
       await websocket.send_json(data)
       return True
     return False
@@ -972,6 +994,13 @@ async def stop_container():
   except (ConnectionError, RuntimeError) as e:
     logger.error("Error stopping container: %s", str(e))
     raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+  """Clean up resources when server shuts down"""
+  podman_manager.cleanup()
+  logger.info("Server shutdown complete")
 
 
 if __name__ == "__main__":

@@ -19,11 +19,15 @@ import time
 from collections import deque
 from threading import Lock
 from typing import Any, Dict, List
+from datetime import datetime
 
 import podman
 from podman import errors as podman_errors
 from podman.domain.containers import Container
 import urllib3
+
+from command_cache import CommandCache, CacheEntry
+from config import Config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -44,14 +48,15 @@ class PodmanManager:
   - Log streaming and monitoring
   - Container status checking
   - Output buffering and processing
+  - Command result caching
   """
-
-  def __init__(self, container_name: str):
+  def __init__(self, container_name: str, config_file: str = "config.json"):
     """
     Initialize the PodmanManager instance.
 
     Args:
       container_name (str): The name of the container to manage
+      config_file (str, optional): Path to config file. Defaults to "config.json".
     """
     self.container_name = container_name
     self.output_buffer = deque(maxlen=20)  # Limit to last 20 lines
@@ -61,6 +66,19 @@ class PodmanManager:
     self.client = None
     self.pool_manager = urllib3.PoolManager(maxsize=25)
     self._init_client()
+
+    # Load config and initialize command cache
+    self.config = Config(config_file)
+    self.command_cache = CommandCache(self.send_command)
+
+    # Configure command cache with polling intervals
+    for command, config in self.config.get_command_polling_intervals().items():
+      if "invalidate_on_commands" in config:
+        self.command_cache._command_configs[command].invalidate_on_commands = config["invalidate_on_commands"]
+      self.command_cache._command_configs[command].polling_interval = config["polling_interval"]
+
+    # Start command cache polling
+    self.command_cache.start()
 
   def _init_client(self) -> None:
     """
@@ -260,18 +278,26 @@ class PodmanManager:
     logger.warning("No response lines found")
     return ""
 
-  def send_command(self, command: str, timeout: int = 10) -> str:
+  def send_command(self, command: str, timeout: int = 10, use_cache: bool = True) -> str:
     """
     Send a command to the container's console.
 
     Args:
       command (str): The command to send
       timeout (int, optional): Timeout for the command execution. Defaults to 10.
+      use_cache (bool, optional): Whether to use command caching. Defaults to True.
 
     Returns:
       str: The output of the command
     """
-    logger.info("Sending command to container: %s", command)
+    logger.info("Sending command to container: %s (use_cache=%s)", command, use_cache)
+
+    # Check cache if caching is enabled for this command
+    if use_cache and self.command_cache.is_cacheable(command):
+      cached_result = self.command_cache.get(command)
+      if cached_result is not None:
+        logger.debug("Using cached result for command: %s", command)
+        return cached_result
 
     try:
       if not self.is_container_running():
@@ -285,42 +311,60 @@ class PodmanManager:
       container = self.client.containers.get(self.container_name)
       logger.info("Container verified: %s", container.name)
 
-      with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', delete=False, suffix='.txt') as cmd_file:
-        cmd_path = cmd_file.name
-        cmd_file.write(command)
+      processed_output = self._run_command_with_tempfiles(command, timeout)
 
-      output_path = os.path.join(os.path.dirname(cmd_path), f"output_{os.getpid()}.txt")
+      # Store in cache if caching is enabled and command is cacheable
+      if use_cache and self.command_cache.is_cacheable(command):
+        now = datetime.now()
+        self.command_cache.set(command, CacheEntry(
+          data=processed_output,
+          timestamp=now,
+          last_updated=now
+        ))
 
-      try:
-        process = self._execute_command_process(command, output_path)
-
-        try:
-          process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-          logger.warning("Process timed out after %d seconds, sending SIGTERM", timeout)
-          process.terminate()
-          try:
-            process.wait(timeout=2)
-          except subprocess.TimeoutExpired:
-            logger.warning("Termination timed out, sending SIGKILL")
-            process.kill()
-
-        with open(output_path, 'r', encoding='utf-8') as output_file:
-          output = output_file.read()
-          return self._process_command_output(output, command)
-
-      finally:
-        for path in [cmd_path, output_path]:
-          try:
-            if os.path.exists(path):
-              os.unlink(path)
-          except OSError as e:
-            logger.warning("Error cleaning up temporary file %s: %s", path, str(e))
+      return processed_output
 
     except (ConnectionError, RuntimeError) as e:
       error_msg = str(e).strip() or "Unknown error"
       logger.error("Error sending command to container: %s", error_msg)
       return f"Error: {error_msg}"
+
+  def _run_command_with_tempfiles(self, command: str, timeout: int) -> str:
+    """
+    Helper to handle temp file creation, process execution, and cleanup for send_command.
+    """
+    with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', delete=False, suffix='.txt') as cmd_file:
+      cmd_path = cmd_file.name
+      cmd_file.write(command)
+
+    output_path = os.path.join(os.path.dirname(cmd_path), f"output_{os.getpid()}.txt")
+
+    try:
+      process = self._execute_command_process(command, output_path)
+
+      try:
+        process.wait(timeout=timeout)
+      except subprocess.TimeoutExpired:
+        logger.warning("Process timed out after %d seconds, sending SIGTERM", timeout)
+        process.terminate()
+        try:
+          process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+          logger.warning("Termination timed out, sending SIGKILL")
+          process.kill()
+
+      with open(output_path, 'r', encoding='utf-8') as output_file:
+        output = output_file.read()
+        processed_output = self._process_command_output(output, command)
+        return processed_output
+
+    finally:
+      for path in [cmd_path, output_path]:
+        try:
+          if os.path.exists(path):
+            os.unlink(path)
+        except OSError as e:
+          logger.warning("Error cleaning up temporary file %s: %s", path, str(e))
 
   def _process_logs(self, container: Container, callback) -> None:
     """
@@ -426,6 +470,9 @@ class PodmanManager:
       if not self.client:
         raise RuntimeError(ERROR_CLIENT_NOT_INITIALIZED)
 
+      # Stop command cache polling while restarting
+      self.command_cache.stop()
+
       container = self.client.containers.get(self.container_name)
       self._monitor_running = False
 
@@ -438,6 +485,9 @@ class PodmanManager:
         container.reload()
         if container.status == 'running':
           logger.info("Container successfully restarted")
+          # Restart command cache polling with a short delay
+          time.sleep(2)
+          self.command_cache.start()
           return True
         time.sleep(1)
         retries += 1
@@ -534,3 +584,13 @@ class PodmanManager:
     except (ConnectionError, RuntimeError, podman_errors.ContainerNotFound) as e:
       logger.error("Error getting container logs: %s", str(e))
       return f"Error getting logs: {str(e)}"
+
+  def cleanup(self) -> None:
+    """Clean up resources when manager is being shut down."""
+    if self.command_cache:
+      self.command_cache.stop()
+
+    if self.client:
+      self.client.close()
+
+    self._monitor_running = False
