@@ -14,6 +14,7 @@ The application provides multiple WebSocket endpoints:
 - `ws://your-server-ip:8000/ws/memory` - For memory usage monitoring
 - `ws://your-server-ip:8000/ws/container_status` - For container status monitoring
 - `ws://your-server-ip:8000/ws/heartbeat` - Heartbeat connection to keep other WebSockets alive
+- `ws://your-server-ip:8000/ws/status` - For status monitoring and updates
 
 ## Message Format
 
@@ -46,6 +47,10 @@ Special commands:
 - `listbans` - Returns a structured list of banned users
 - `friendRequests` - Returns a list of pending friend requests
 - `worlds` - Returns information about all running worlds
+- `status` - Returns current server status
+- `users` - Returns list of users
+- `sessionUrl` - Returns session URL
+- `sessionID` - Returns session ID
 
 ### 2. Container Status Request
 
@@ -69,6 +74,16 @@ Get information about all running worlds:
 }
 ```
 
+### 4. Status Request
+
+Get server status:
+
+```json
+{
+  "type": "get_status"
+}
+```
+
 ## Resource Monitoring
 
 ### 1. CPU Usage
@@ -81,7 +96,7 @@ The memory endpoint automatically streams memory usage updates every second. No 
 
 ### 3. Container Logs
 
-The logs endpoint automatically streams log updates in real-time. Upon connection, it sends the last 20 log lines  
+The logs endpoint automatically streams log updates in real-time. Upon connection, it sends recent logs
 and then streams new logs as they occur.
 
 ## Response Formats
@@ -123,8 +138,7 @@ Automatic updates from the CPU endpoint:
 ```json
 {
   "type": "cpu_update",
-  "cpu_usage": 5.2,
-  "timestamp": "2025-05-31T12:34:56.789Z"
+  "cpu_usage": 5.2
 }
 ```
 
@@ -137,8 +151,7 @@ Automatic updates from the memory endpoint:
   "type": "memory_update",
   "memory_percent": 45.3,
   "memory_used": "4.2GB",
-  "memory_total": "16.0GB",
-  "timestamp": "2025-05-31T12:34:56.789Z"
+  "memory_total": "16.0GB"
 }
 ```
 
@@ -154,8 +167,7 @@ Response to container status request:
     "name": "container_name",
     "id": "container_id",
     "image": "container_image"
-  },
-  "timestamp": "2025-05-31T12:34:56.789Z"
+  }
 }
 ```
 
@@ -182,7 +194,8 @@ Response to worlds request:
       "users_list": [
         {
           "username": "User1",
-          "userId": "U-xxx",
+          "id": "U-xxx",
+          "role": "User",
           "present": true,
           "ping": 50,
           "fps": 72.5,
@@ -191,7 +204,8 @@ Response to worlds request:
       ]
     }
   ],
-  "timestamp": "2025-05-31T12:34:56.789Z"
+  "timestamp": "2025-05-31T12:34:56.789Z",
+  "cached": true // Optional, present when response is from cache
 }
 ```
 
@@ -203,7 +217,7 @@ Real-time container log messages:
 {
   "type": "container_output",
   "output": "output_text",
-  "timestamp": "2025-05-27T12:34:56.789"
+  "timestamp": "2025-05-31T12:34:56.789Z"
 }
 ```
 
@@ -224,6 +238,55 @@ The application also provides REST endpoints:
 
 ### 1. Configuration Management
 
+#### Configuration File Management
+
+- `GET /api/config/status` - Check if using config file or built-in settings
+
+```json
+{
+  "using_config_file": true
+}
+```
+
+- `GET /api/config/settings` - Get current configuration settings
+
+```json
+{
+  "using_config_file": true,
+  "config_file_path": "config.json",
+  "settings": {
+    "cache": {
+      "worlds_interval": 10,
+      "status_interval": 10,
+      "sessionurl_interval": 30,
+      "sessionid_interval": 30,
+      "users_interval": 5,
+      "listbans_interval": 60
+    }
+  }
+}
+```
+
+- `POST /api/config/generate` - Generate config.json file if not exists
+
+```json
+{
+  "status": "created",
+  "message": "Generated new config file at config.json"
+}
+```
+
+or if config exists:
+
+```json
+{
+  "status": "unchanged",
+  "message": "Config file already exists and is being used"
+}
+```
+
+#### Headless Server Configuration
+
 - `GET /config` - Get the current headless server configuration
 - `POST /config` - Update the headless server configuration
 
@@ -233,6 +296,10 @@ The application also provides REST endpoints:
 - `POST /api/stop-container` - Stop the container
 - `POST /api/restart-container` - Restart the container
 
+### 3. World Management
+
+- `POST /api/world-properties` - Update world properties (requires session ID)
+
 ## Additional Features
 
 - Real-time streaming of CPU usage, memory usage, and container logs
@@ -241,5 +308,6 @@ The application also provides REST endpoints:
 - Connection state management
 - CORS support for web interface integration
 - Heartbeat mechanism to keep connections alive
-- Initial log history on connection (last 20 lines)
 - Request-based container status updates to reduce API load
+- Command caching with configurable intervals
+- Cache invalidation hooks (e.g., ban/unban commands invalidate ban list cache)
