@@ -197,10 +197,6 @@ button {
   font-weight: bold;
 }
 
-button:active {
-  background-color: #3d8b40;
-}
-
 .world-details {
   display: grid;
   grid-template-columns: 1fr 1fr;
