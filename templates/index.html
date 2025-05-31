@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" xml:lang="en">
 
 <head>
   <title>Resonite Headless Manager</title>
@@ -66,10 +66,10 @@
     <div class="sidebar">
       <!-- Application Settings Card -->
       <div class="settings-card">
-        <div class="sidebar-header collapsible" onclick="toggleCard('app-settings')">
+        <button class="sidebar-header collapsible" type="button" onclick="toggleCard('app-settings')">
           <span>Application Settings</span>
           <span class="collapse-icon">▼</span>
-        </div>
+        </button>
         <div class="card-content" id="app-settings">
           <div class="setting-group">
             <label class="setting-label" for="refresh-interval">World Refresh Interval</label>
@@ -97,10 +97,10 @@
 
       <!-- Friend Requests Card -->
       <div class="settings-card friend-requests-card">
-        <div class="sidebar-header collapsible" onclick="toggleCard('friend-requests')">
+        <button class="sidebar-header collapsible" type="button" onclick="toggleCard('friend-requests')" onkeydown="if(event.key==='Enter'||event.key===' '){toggleCard('friend-requests');}">
           <span>Friend Requests</span>
           <span class="collapse-icon">▼</span>
-        </div>
+        </button>
         <div class="card-content" id="friend-requests">
           <div id="friend-requests-list">
             <div class="no-requests">No pending friend requests</div>
@@ -110,10 +110,10 @@
 
       <!-- Banned Users Card -->
       <div class="settings-card banned-users-card">
-        <div class="sidebar-header collapsible" onclick="toggleCard('banned-users')">
+        <button class="sidebar-header collapsible" type="button" onclick="toggleCard('banned-users')" onkeydown="if(event.key==='Enter'||event.key===' '){toggleCard('banned-users');}">
           <span>Banned Users</span>
           <span class="collapse-icon">▼</span>
-        </div>
+        </button>
         <div class="card-content" id="banned-users">
           <div class="ban-form">
             <input type="text" id="ban-username" class="setting-input" placeholder="Enter username to ban...">
@@ -153,8 +153,8 @@
           </div>
 
           <div class="setting-row">
-            <label class="setting-label">Hidden</label>
-            <label class="checkbox-wrapper">
+            <label class="setting-label" for="world-hidden">Hidden</label>
+            <label class="checkbox-wrapper" for="world-hidden">
               <input type="checkbox" id="world-hidden">
               <span class="checkbox-custom"></span>
             </label>
