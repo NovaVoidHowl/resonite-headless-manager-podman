@@ -1564,14 +1564,6 @@ button {
   transition: all 0.2s ease;
 }
 
-.container-controls-title .collapse-icon {
-  transform: rotate(0deg);
-  transition: transform 0.2s ease;
-}
-
-.container-controls-title.collapsed .collapse-icon {
-  transform: rotate(-90deg);
-}
 
 .container-controls .card-content {
   overflow: hidden;
