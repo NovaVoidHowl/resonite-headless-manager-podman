@@ -92,19 +92,26 @@
 
         .endpoint:last-child {
             border-bottom: none;
-        }
-
-        .endpoint-header {
+        }        .endpoint-header {
             padding: 1.5rem 2rem;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 1rem;
             transition: background-color 0.2s;
+            width: 100%;
+            border: none;
+            background: none;
+            text-align: left;
+            font-family: inherit;
+            font-size: inherit;
         }
 
-        .endpoint-header:hover {
+        .endpoint-header:hover,
+        .endpoint-header:focus {
             background-color: #f8f9fa;
+            outline: 2px solid #1f8954;
+            outline-offset: -2px;
         }
 
         .method {
@@ -336,7 +343,6 @@
     <div class="container">
         <div class="info-section">
             <h2>API Information</h2>
-            <p><strong>Version:</strong> 1.0.0</p>
             <p><strong>Base URL:</strong> <code>http://your-server-ip:8000</code></p>
             <p><strong>WebSocket URL:</strong> <code>ws://your-server-ip:8000</code></p>
             <p>This API provides comprehensive management capabilities for Resonite headless servers including real-time monitoring, configuration management, and world control.</p>
@@ -349,13 +355,13 @@
                 <p>Real-time communication endpoints for monitoring and control</p>
             </div>
 
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method websocket">WS</span>
                     <span class="endpoint-path">/ws/command</span>
                     <span class="endpoint-summary">Send commands to the server</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Send commands to the headless server and receive structured responses.</p>
@@ -400,21 +406,21 @@
                 </div>
             </div>
 
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method websocket">WS</span>
                     <span class="endpoint-path">/ws/worlds</span>
                     <span class="endpoint-summary">Monitor world information</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Real-time updates about world status, users, and properties.</p>
                     
                     <h4>Request Message</h4>
                     <div class="code-block">{
-  "type": "get_worlds"
-}</div>
+                      "type": "get_worlds"
+                    }</div>
 
                     <h4>Response Example</h4>
                     <div class="code-block">{
@@ -450,13 +456,13 @@
                 </div>
             </div>
 
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method websocket">WS</span>
                     <span class="endpoint-path">/ws/logs</span>
                     <span class="endpoint-summary">Stream container logs</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Real-time streaming of container logs. Automatically sends recent logs on connection and streams new logs.</p>
@@ -473,15 +479,13 @@
   "timestamp": "2025-05-31T12:34:56.789Z"
 }</div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method websocket">WS</span>
                     <span class="endpoint-path">/ws/cpu</span>
                     <span class="endpoint-summary">Monitor CPU usage</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Real-time CPU usage monitoring with updates every second.</p>
@@ -497,15 +501,13 @@
   "cpu_usage": 5.2
 }</div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method websocket">WS</span>
                     <span class="endpoint-path">/ws/memory</span>
                     <span class="endpoint-summary">Monitor memory usage</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Real-time memory usage monitoring with updates every second.</p>
@@ -523,15 +525,13 @@
   "memory_total": "16.0GB"
 }</div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method websocket">WS</span>
                     <span class="endpoint-path">/ws/container_status</span>
                     <span class="endpoint-summary">Monitor container status</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Get container status information on demand.</p>
@@ -552,15 +552,13 @@
   }
 }</div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method websocket">WS</span>
                     <span class="endpoint-path">/ws/heartbeat</span>
                     <span class="endpoint-summary">Heartbeat connection</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Heartbeat connection to keep other WebSocket connections alive.</p>
@@ -570,15 +568,13 @@
                         <p>This endpoint is used internally to maintain connection state.</p>
                     </div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method websocket">WS</span>
                     <span class="endpoint-path">/ws/status</span>
                     <span class="endpoint-summary">Status monitoring and updates</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Monitor server status and receive real-time updates.</p>
@@ -596,15 +592,13 @@
             <div class="group-header">
                 <h3>REST API Endpoints</h3>
                 <p>HTTP endpoints for configuration and container management</p>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method get">GET</span>
                     <span class="endpoint-path">/</span>
                     <span class="endpoint-summary">Serve main web interface</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Returns the main web interface HTML page.</p>
@@ -616,15 +610,13 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method get">GET</span>
                     <span class="endpoint-path">/config</span>
                     <span class="endpoint-summary">Get headless server configuration</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Retrieve the current headless server configuration.</p>
@@ -636,15 +628,13 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method post">POST</span>
                     <span class="endpoint-path">/config</span>
                     <span class="endpoint-summary">Update headless server configuration</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Update the headless server configuration with new settings.</p>
@@ -662,15 +652,13 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method get">GET</span>
                     <span class="endpoint-path">/api/config/status</span>
                     <span class="endpoint-summary">Check configuration file status</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Check if the system is using a config file or built-in settings.</p>
@@ -680,15 +668,13 @@
   "using_config_file": true
 }</div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method get">GET</span>
                     <span class="endpoint-path">/api/config/settings</span>
                     <span class="endpoint-summary">Get current configuration settings</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Retrieve current configuration settings including cache intervals.</p>
@@ -709,15 +695,13 @@
   }
 }</div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method post">POST</span>
                     <span class="endpoint-path">/api/config/generate</span>
                     <span class="endpoint-summary">Generate config file</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Generate a new config.json file if it doesn't exist.</p>
@@ -733,15 +717,13 @@
   "message": "Config file already exists and is being used"
 }</div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method post">POST</span>
                     <span class="endpoint-path">/api/world-properties</span>
                     <span class="endpoint-summary">Update world properties</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Update properties for a specific world. Requires session ID.</p>
@@ -763,15 +745,13 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method post">POST</span>
                     <span class="endpoint-path">/api/start-container</span>
                     <span class="endpoint-summary">Start the container</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Start the Resonite headless container.</p>
@@ -783,15 +763,13 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method post">POST</span>
                     <span class="endpoint-path">/api/stop-container</span>
                     <span class="endpoint-summary">Stop the container</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Stop the Resonite headless container.</p>
@@ -803,15 +781,13 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="endpoint" onclick="toggleEndpoint(this)">
-                <div class="endpoint-header">
+            </div>            <div class="endpoint">
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method post">POST</span>
                     <span class="endpoint-path">/api/restart-container</span>
                     <span class="endpoint-summary">Restart the container</span>
                     <span class="toggle-icon">▼</span>
-                </div>
+                </button>
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Restart the Resonite headless container.</p>
