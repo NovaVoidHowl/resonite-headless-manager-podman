@@ -1068,10 +1068,6 @@ button {
   font-family: 'Roboto', sans-serif;
 }
 
-.collapsible-header:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
 .collapsible-header.collapsed {
   margin-bottom: 0;
 }
