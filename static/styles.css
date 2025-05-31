@@ -1571,8 +1571,9 @@ button:active {
   transition: all 0.2s ease;
 }
 
-.container-controls-title:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+.container-controls-title .collapse-icon {
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
 }
 
 .container-controls-title.collapsed .collapse-icon {
