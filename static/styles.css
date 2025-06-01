@@ -642,19 +642,6 @@ button {
   font-weight: 300;
 }
 
-.user-name {
-  font-weight: bold;
-  color: #ffffff;
-  font-family: 'Roboto', sans-serif;
-}
-
-.user-role {
-  font-size: 0.8em;
-  padding: 2px 6px;
-  background-color: #4CAF50;
-  border-radius: 10px;
-  color: white;
-}
 
 .user-stats {
   display: flex;
@@ -1398,12 +1385,6 @@ button {
 }
 
 /* Add these styles after the user-card styles */
-.user-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
 
 .user-action-btn {
   padding: 4px 8px;
@@ -1450,32 +1431,8 @@ button {
 }
 
 /* Add these styles after the .user-role styles */
-.role-select {
-  background-color: #2a2a2a;
-  color: #ffffff;
-  border: 1px solid #3a3a3a;
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 0.9em;
-  cursor: pointer;
-  transition: all 0.2s;
-}
 
-.role-select:hover {
-  border-color: #4CAF50;
-}
 
-.role-select:focus {
-  outline: none;
-  border-color: #4CAF50;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
-}
-
-.role-select option {
-  background-color: #1a1a1a;
-  color: #ffffff;
-  padding: 8px;
-}
 
 /* Add these styles after the save-button styles */
 .property-buttons {
@@ -1506,14 +1463,6 @@ button {
 .cancel-button:active {
   background-color: #555;
   transform: translateY(0);
-}
-
-/* Add these styles after the user-card styles */
-.user-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
 }
 
 .copy-buttons {
@@ -1800,12 +1749,6 @@ button {
   font-size: 1.1em;
 }
 
-.no-users {
-  color: #888;
-  text-align: center;
-  padding: 12px;
-  font-style: italic;
-}
 
 #world-properties-users-list .user-list {
   margin-top: 0;
@@ -1911,5 +1854,219 @@ button {
         --log-text-color: #ffffff;
         --timestamp-color: #888888;
     }
+}
+
+/* World Users Section Styles */
+.world-users-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #4a4a4a;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+.users-title {
+  font-weight: 600;
+  color: #4CAF50;
+  font-size: 1em;
+}
+
+.refresh-users-btn {
+  background-color: #666;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.refresh-users-btn:hover {
+  background-color: #777;
+}
+
+.users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.loading-users {
+  color: #888;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+}
+
+.no-users {
+  color: #888;
+  text-align: center;
+  padding: 20px;
+  font-style: italic;
+}
+
+.user-item {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid #4a4a4a;
+  border-radius: 6px;
+  padding: 12px;
+  transition: background-color 0.2s;
+}
+
+.user-item:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.user-item.cached-data {
+  opacity: 0.8;
+  border-left: 3px solid #ffc107;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.user-name {
+  font-weight: 600;
+  color: #4CAF50;
+  font-size: 1.05em;
+}
+
+.user-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.9em;
+}
+
+.user-id {
+  color: #888;
+  font-family: 'Roboto Mono', monospace;
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.user-role {
+  background-color: #2196F3;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.user-status {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.user-status.present {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.user-status.away {
+  background-color: #ff9800;
+  color: white;
+}
+
+.user-ping {
+  color: #4CAF50;
+  font-family: 'Roboto Mono', monospace;
+}
+
+.user-fps {
+  color: #2196F3;
+  font-family: 'Roboto Mono', monospace;
+}
+
+.user-silenced {
+  background-color: #f44336;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.user-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.role-select {
+  background-color: #2a2a2a;
+  color: white;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.9em;
+}
+
+.role-select:focus {
+  outline: none;
+  border-color: #4CAF50;
+}
+
+.role-select:hover {
+  border-color: #4CAF50;
+}
+
+.role-select option {
+  background-color: #1a1a1a;
+  color: #ffffff;
+  padding: 8px;
+}
+
+.kick-btn {
+  background-color: #ff9800;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.kick-btn:hover {
+  background-color: #f57c00;
+}
+
+.ban-btn {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.ban-btn:hover {
+  background-color: #d32f2f;
 }
 

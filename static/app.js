@@ -406,7 +406,18 @@ function updateWorlds(worlds, timestamp, cached = false) {
       </div>
       <div class="world-actions">
         <button onclick="selectWorld(${index})" class="select-world-btn">Select World</button>
-        <button onclick="showWorldUsers(${index})" class="show-users-btn">Show Users (${present})</button>
+        <button onclick="toggleWorldUsers(${index})" class="show-users-btn" id="show-users-btn-${index}">Show Users (${present})</button>
+      </div>
+      <div class="world-users-section" id="world-users-${index}" style="display: none;">
+        <div class="users-header">
+          <span class="users-title">Connected Users</span>
+          <button onclick="refreshWorldUsersList(${index})" class="refresh-users-btn" title="Refresh users list">
+            ↻
+          </button>
+        </div>
+        <div class="users-list" id="users-list-${index}">
+          <div class="loading-users">Loading users...</div>
+        </div>
       </div>
     `;
     
@@ -710,31 +721,38 @@ function showWorldProperties(worldIndex) {
   }
 }
 
-function showWorldUsers(worldIndex) {
-  selectedWorldIndex = worldIndex;
+function toggleWorldUsers(worldIndex) {
+  const usersSection = document.getElementById(`world-users-${worldIndex}`);
+  const showUsersBtn = document.getElementById(`show-users-btn-${worldIndex}`);
+  const usersList = document.getElementById(`users-list-${worldIndex}`);
   
-  // Show connected users panel
-  const connectedUsersPanel = document.getElementById('connected-users');
-  const connectedUsersWorldName = document.getElementById('connected-users-world-name');
-  
-  // Get world data
-  const worldsList = document.getElementById('worlds-list');
-  const worldItems = worldsList.querySelectorAll('.world-item');
-  
-  if (worldIndex >= 0 && worldIndex < worldItems.length) {
-    const worldItem = worldItems[worldIndex];
-    const worldTitle = worldItem.querySelector('.world-title h3').textContent;
+  if (usersSection.style.display === 'none') {
+    // Show users section
+    usersSection.style.display = 'block';
+    showUsersBtn.textContent = showUsersBtn.textContent.replace('Show', 'Hide');
     
-    connectedUsersWorldName.textContent = worldTitle;
-    connectedUsersPanel.style.display = 'block';
+    // Set the selected world index for API calls
+    selectedWorldIndex = worldIndex;
     
-    // Request users for this world
-    refreshUsersList();
+    // Load users data
+    refreshWorldUsersList(worldIndex);
+  } else {
+    // Hide users section
+    usersSection.style.display = 'none';
+    showUsersBtn.textContent = showUsersBtn.textContent.replace('Hide', 'Show');
   }
 }
 
-function refreshUsersList() {
-  if (selectedWorldIndex !== null && wsCommand && wsCommand.readyState === WebSocket.OPEN) {
+function refreshWorldUsersList(worldIndex) {
+  const usersList = document.getElementById(`users-list-${worldIndex}`);
+  if (usersList) {
+    usersList.innerHTML = '<div class="loading-users">Loading users...</div>';
+  }
+  
+  // Set the selected world index for API calls
+  selectedWorldIndex = worldIndex;
+  
+  if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
     wsCommand.send(JSON.stringify({
       type: 'command',
       command: 'users'
@@ -743,7 +761,12 @@ function refreshUsersList() {
 }
 
 function updateConnectedUsers(users, timestamp, cached = false) {
-  const usersList = document.getElementById('connected-users-list');
+  // Target the specific world's users list instead of sidebar
+  if (selectedWorldIndex === null) return;
+  
+  const usersList = document.getElementById(`users-list-${selectedWorldIndex}`);
+  if (!usersList) return;
+  
   usersList.innerHTML = '';
   
   // Handle different response formats and ensure users is an array
