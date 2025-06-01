@@ -96,7 +96,7 @@ class CommandCache:
             timestamp=now,
             last_updated=now
           )
-          logger.debug("Updated cache for command: %s", cmd)
+          logger.info("Updated cache for command: %s", cmd)
         except (ConnectionError, RuntimeError) as e:
           logger.error("Error polling command %s: %s", cmd, e)
         except (IOError, OSError, ValueError) as e:

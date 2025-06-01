@@ -65,20 +65,33 @@ class PodmanManager:
     self._monitor_running = False
     self.client = None
     self.pool_manager = urllib3.PoolManager(maxsize=25)
-    self._init_client()
-
-    # Load config and initialize command cache
+    self._init_client()    # Load config and initialize command cache
     self.config = Config(config_file)
-    self.command_cache = CommandCache(self.send_command)
+    self.command_cache = CommandCache(self._send_command_for_cache)
 
     # Configure command cache with polling intervals
     for command, config in self.config.get_command_polling_intervals().items():
       if "invalidate_on_commands" in config:
         self.command_cache._command_configs[command].invalidate_on_commands = config["invalidate_on_commands"]
-      self.command_cache._command_configs[command].polling_interval = config["polling_interval"]
-
-    # Start command cache polling
+      self.command_cache._command_configs[command].polling_interval = config["polling_interval"]    # Start command cache polling
+    intervals = {cmd: config['polling_interval']
+                 for cmd, config in self.config.get_command_polling_intervals().items()}
+    logger.info("Starting command cache polling with intervals: %s", intervals)
     self.command_cache.start()
+    logger.info("Command cache polling started successfully")
+
+  def _send_command_for_cache(self, command: str) -> str:
+    """
+    Execute a command without caching for use by the cache polling system.
+    This prevents recursive cache calls.
+    
+    Args:
+      command (str): The command to execute
+      
+    Returns:
+      str: The output of the command
+    """
+    return self.send_command(command, timeout=10, use_cache=False)
 
   def _init_client(self) -> None:
     """
