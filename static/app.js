@@ -15,6 +15,7 @@ const statusDiv = document.getElementById('status');
 let selectedWorldIndex = null;
 let currentConfig = null;
 let configChanged = false;
+let currentWorldsData = []; // Store current worlds data for form population
 
 // Intervals and timers
 let friendRequestsInterval = 5 * 60 * 1000; // Default 5 minutes
@@ -343,6 +344,9 @@ function updateWorlds(worlds, timestamp, cached = false) {
       worldsArray = [];
     }
   }
+  
+  // Store current worlds data globally for form population
+  currentWorldsData = worldsArray;
   
   if (!worldsArray || worldsArray.length === 0) {
     worldsList.innerHTML = '<div class="no-worlds">No worlds running</div>';
@@ -703,28 +707,31 @@ function showWorldProperties(worldIndex) {
   const worldPropertiesPanel = document.getElementById('world-properties');
   const selectedWorldName = document.getElementById('selected-world-name');
   
-  // Get world data (this would need to be stored globally or retrieved)
-  // For now, we'll get it from the DOM
-  const worldsList = document.getElementById('worlds-list');
-  const worldItems = worldsList.querySelectorAll('.world-item');
-  
-  if (worldIndex >= 0 && worldIndex < worldItems.length) {
-    const worldItem = worldItems[worldIndex];
-    const worldTitle = worldItem.querySelector('.world-title h3').textContent;
+  if (worldIndex >= 0 && worldIndex < currentWorldsData.length) {
+    const world = currentWorldsData[worldIndex];
     
-    selectedWorldName.textContent = worldTitle;
+    // Update the selected world name
+    selectedWorldName.textContent = world.name || 'Unnamed World';
     worldPropertiesPanel.style.display = 'block';
     
-    // Populate form fields (you'd need to extract this data from the world object)
-    document.getElementById('world-name').value = worldTitle;
-    // Add more field population as needed
+    // Populate all form fields with actual world data
+    document.getElementById('world-name').value = world.name || '';
+    document.getElementById('world-hidden').checked = world.hidden || false;
+    document.getElementById('world-description').value = world.description || '';
+    
+    // Handle access level (both old and new data structure)
+    const accessLevel = world.access_level || world.accessLevel || 'Anyone';
+    document.getElementById('world-access-level').value = accessLevel;
+    
+    // Handle max users (both old and new data structure)
+    const maxUsers = world.user_count ? world.user_count.max_users : (world.maxUsers || 10);
+    document.getElementById('world-max-users').value = maxUsers;
   }
 }
 
 function toggleWorldUsers(worldIndex) {
   const usersSection = document.getElementById(`world-users-${worldIndex}`);
   const showUsersBtn = document.getElementById(`show-users-btn-${worldIndex}`);
-  const usersList = document.getElementById(`users-list-${worldIndex}`);
   
   if (usersSection.style.display === 'none') {
     // Show users section
@@ -832,29 +839,39 @@ function sendWorldCommand(command) {
     return;
   }
   
-  // Get the session ID from the selected world
-  const worldsList = document.getElementById('worlds-list');
-  const worldItems = worldsList.querySelectorAll('.world-item');
+  if (selectedWorldIndex >= currentWorldsData.length) {
+    showError('Invalid world selection');
+    return;
+  }
   
-  if (selectedWorldIndex >= 0 && selectedWorldIndex < worldItems.length) {
-    const worldItem = worldItems[selectedWorldIndex];
-    const sessionId = worldItem.querySelector('.session-id').textContent;
+  // Get the session ID from stored world data
+  const world = currentWorldsData[selectedWorldIndex];
+  const sessionId = world.sessionId;
+  
+  if (!sessionId) {
+    showError('No session ID found for selected world');
+    return;
+  }
+  
+  if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
+    wsCommand.send(JSON.stringify({
+      type: 'command',
+      command: `${command} ${sessionId}`
+    }));
     
-    if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
-      wsCommand.send(JSON.stringify({
-        type: 'command',
-        command: `${command} ${sessionId}`
-      }));
-      
-      showLoadingOverlay(`Executing ${command} command...`);
-      setTimeout(hideLoadingOverlay, 2000);
-    }
+    showLoadingOverlay(`Executing ${command} command...`);
+    setTimeout(hideLoadingOverlay, 2000);
   }
 }
 
 function saveWorldProperties() {
   if (selectedWorldIndex === null) {
     showError('No world selected');
+    return;
+  }
+  
+  if (selectedWorldIndex >= currentWorldsData.length) {
+    showError('Invalid world selection');
     return;
   }
   
@@ -866,44 +883,44 @@ function saveWorldProperties() {
     maxUsers: parseInt(document.getElementById('world-max-users').value)
   };
   
-  // Get session ID
-  const worldsList = document.getElementById('worlds-list');
-  const worldItems = worldsList.querySelectorAll('.world-item');
+  // Get session ID from stored world data
+  const world = currentWorldsData[selectedWorldIndex];
+  const sessionId = world.sessionId;
   
-  if (selectedWorldIndex >= 0 && selectedWorldIndex < worldItems.length) {
-    const worldItem = worldItems[selectedWorldIndex];
-    const sessionId = worldItem.querySelector('.session-id').textContent;
-    
-    // Send to API
-    fetch('/api/world-properties', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        sessionId: sessionId,
-        ...worldData
-      })
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        hideLoadingOverlay();
-        // Refresh worlds list
-        if (wsWorlds && wsWorlds.readyState === WebSocket.OPEN) {
-          wsWorlds.send(JSON.stringify({ type: 'get_worlds' }));
-        }
-      } else {
-        throw new Error(data.error || 'Failed to save world properties');
-      }
-    })
-    .catch(error => {
-      hideLoadingOverlay();
-      showError(error.message);
-    });
-    
-    showLoadingOverlay('Saving world properties...');
+  if (!sessionId) {
+    showError('No session ID found for selected world');
+    return;
   }
+  
+  showLoadingOverlay('Saving world properties...');
+  
+  // Send to API
+  fetch('/api/world-properties', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      sessionId: sessionId,
+      ...worldData
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      hideLoadingOverlay();
+      // Refresh worlds list
+      if (wsWorlds && wsWorlds.readyState === WebSocket.OPEN) {
+        wsWorlds.send(JSON.stringify({ type: 'get_worlds' }));
+      }
+    } else {
+      throw new Error(data.error || 'Failed to save world properties');
+    }
+  })
+  .catch(error => {
+    hideLoadingOverlay();
+    showError(error.message);
+  });
 }
 
 function cancelWorldProperties() {
