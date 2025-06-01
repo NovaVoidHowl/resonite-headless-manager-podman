@@ -1058,7 +1058,9 @@ button {
   border-bottom: 1px solid #3a3a3a;
   text-align: left;
   background: none;
-  border: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
@@ -1600,7 +1602,7 @@ button {
   display: flex;
   gap: 8px;
   justify-content: center;
-  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .container-control-btn {
