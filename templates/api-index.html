@@ -897,6 +897,14 @@
             } else {
                 requestBodyGroup.style.display = 'none';
             }
+        }        function formatJsonResponse(text) {
+            try {
+                const parsed = JSON.parse(text);
+                return JSON.stringify(parsed, null, 2);
+            } catch (e) {
+                // If it's not valid JSON, return as-is
+                return text;
+            }
         }
 
         async function makeRequest() {
@@ -928,8 +936,9 @@
                 
                 const response = await fetch(url, options);
                 const data = await response.text();
+                const formattedData = formatJsonResponse(data);
                 
-                output.textContent = `Status: ${response.status}\n\n${data}`;
+                output.textContent = `Status: ${response.status}\n\n${formattedData}`;
             } catch (error) {
                 output.textContent = `Error: ${error.message}`;
             }
@@ -958,10 +967,10 @@
                 sendBtn.disabled = false;
                 disconnectBtn.disabled = false;
             };
-            
-            currentWebSocket.onmessage = function(event) {
+              currentWebSocket.onmessage = function(event) {
                 const timestamp = new Date().toLocaleTimeString();
-                output.textContent += `[${timestamp}] Received: ${event.data}\n`;
+                const formattedData = formatJsonResponse(event.data);
+                output.textContent += `[${timestamp}] Received:\n${formattedData}\n\n`;
                 output.scrollTop = output.scrollHeight;
             };
             
@@ -991,12 +1000,12 @@
                 output.textContent += 'Please enter a message\n';
                 return;
             }
-            
-            try {
+              try {
                 const message = messageInput.value;
                 currentWebSocket.send(message);
                 const timestamp = new Date().toLocaleTimeString();
-                output.textContent += `[${timestamp}] Sent: ${message}\n`;
+                const formattedMessage = formatJsonResponse(message);
+                output.textContent += `[${timestamp}] Sent:\n${formattedMessage}\n\n`;
                 output.scrollTop = output.scrollHeight;
             } catch (error) {
                 output.textContent += `Error sending message: ${error.message}\n`;
@@ -1007,14 +1016,24 @@
             if (currentWebSocket) {
                 currentWebSocket.close();
             }
-        }
-
-        // Auto-scroll to bottom for outputs
+        }        // Auto-scroll to bottom for outputs
         document.addEventListener('DOMContentLoaded', function() {
             const outputs = document.querySelectorAll('.response-output');
             outputs.forEach(output => {
-                output.addEventListener('DOMNodeInserted', function() {
-                    output.scrollTop = output.scrollHeight;
+                // Use MutationObserver instead of deprecated DOMNodeInserted
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.type === 'childList' || mutation.type === 'characterData') {
+                            output.scrollTop = output.scrollHeight;
+                        }
+                    });
+                });
+                
+                // Configure observer to watch for text changes and child nodes
+                observer.observe(output, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true
                 });
             });
         });
