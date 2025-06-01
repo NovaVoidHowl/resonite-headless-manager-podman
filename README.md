@@ -58,6 +58,8 @@
 A web-based management interface for Resonite headless servers running in Podman containers.\
 This application provides real-time monitoring and control of your Resonite worlds through an intuitive web interface.
 
+![Web UI Screenshot](_repo_resources/ui_screenshot_1.PNG)
+
 ## Features
 
 - Real-time Monitoring
