@@ -58,8 +58,6 @@
 A web-based management interface for Resonite headless servers running in Podman containers.\
 This application provides real-time monitoring and control of your Resonite worlds through an intuitive web interface.
 
-![image](https://github.com/user-attachments/assets/ba5a5e28-639d-47bd-b133-5ba4727a91a2)
-
 ## Features
 
 - Real-time Monitoring
@@ -176,10 +174,10 @@ Codebase Link: [https://rhm-pm.dev.novavoidhowl.uk](https://rhm-pm.dev.novavoidh
 
 ## Acknowledgments
 
-This project is substantially based on\
+This project is inspired by / based on\
 [https://github.com/Zetaphor/resonite-headless-manager](https://github.com/Zetaphor/resonite-headless-manager)
 
-Without the above, this project would not exist!
+Without the above, this project would likely not exist!
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
