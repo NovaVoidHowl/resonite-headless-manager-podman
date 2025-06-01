@@ -875,15 +875,6 @@ function saveWorldProperties() {
     return;
   }
   
-  const worldData = {
-    name: document.getElementById('world-name').value,
-    hidden: document.getElementById('world-hidden').checked,
-    description: document.getElementById('world-description').value,
-    accessLevel: document.getElementById('world-access-level').value,
-    maxUsers: parseInt(document.getElementById('world-max-users').value)
-  };
-  
-  // Get session ID from stored world data
   const world = currentWorldsData[selectedWorldIndex];
   const sessionId = world.sessionId;
   
@@ -892,35 +883,100 @@ function saveWorldProperties() {
     return;
   }
   
-  showLoadingOverlay('Saving world properties...');
+  // Get form values
+  const newName = document.getElementById('world-name').value.trim();
+  const newHidden = document.getElementById('world-hidden').checked;
+  const newDescription = document.getElementById('world-description').value.trim();
+  const newAccessLevel = document.getElementById('world-access-level').value;
+  const newMaxUsers = parseInt(document.getElementById('world-max-users').value);
   
-  // Send to API
-  fetch('/api/world-properties', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      sessionId: sessionId,
-      ...worldData
-    })
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
+  // Validate inputs
+  if (!newName) {
+    showError('World name cannot be empty');
+    return;
+  }
+  
+  if (isNaN(newMaxUsers) || newMaxUsers < 1 || newMaxUsers > 100) {
+    showError('Max users must be between 1 and 100');
+    return;
+  }
+  
+  if (!wsCommand || wsCommand.readyState !== WebSocket.OPEN) {
+    showError('Command WebSocket is not connected');
+    return;
+  }
+  
+  showLoadingOverlay('Applying changes to world...');
+  
+  // Track commands sent and completed
+  let commandsToSend = [];
+  let commandsCompleted = 0;
+  
+  // Compare current values with form values to determine what needs to be changed
+  const currentName = world.name || '';
+  const currentHidden = world.hidden || false;
+  const currentDescription = world.description || '';
+  const currentAccessLevel = world.access_level || world.accessLevel || 'Anyone';
+  const currentMaxUsers = world.user_count ? world.user_count.max_users : (world.maxUsers || 10);
+  
+  // Build list of commands to send
+  if (newName !== currentName) {
+    commandsToSend.push(`name "${newName}"`);
+  }
+  
+  if (newHidden !== currentHidden) {
+    commandsToSend.push(`hidefromlisting ${newHidden}`);
+  }
+  
+  if (newDescription !== currentDescription) {
+    commandsToSend.push(`description "${newDescription}"`);
+  }
+  
+  if (newAccessLevel !== currentAccessLevel) {
+    commandsToSend.push(`accesslevel ${newAccessLevel}`);
+  }
+  
+  if (newMaxUsers !== currentMaxUsers) {
+    commandsToSend.push(`maxusers ${newMaxUsers}`);
+  }
+  
+  if (commandsToSend.length === 0) {
+    hideLoadingOverlay();
+    showError('No changes detected');
+    return;
+  }
+  
+  // Function to send next command
+  const sendNextCommand = () => {
+    if (commandsCompleted >= commandsToSend.length) {
+      // All commands completed, refresh worlds list
       hideLoadingOverlay();
-      // Refresh worlds list
       if (wsWorlds && wsWorlds.readyState === WebSocket.OPEN) {
         wsWorlds.send(JSON.stringify({ type: 'get_worlds' }));
       }
-    } else {
-      throw new Error(data.error || 'Failed to save world properties');
+      // Keep the properties panel open to show updated values
+      setTimeout(() => {
+        if (selectedWorldIndex !== null) {
+          showWorldProperties(selectedWorldIndex);
+        }
+      }, 1000);
+      return;
     }
-  })
-  .catch(error => {
-    hideLoadingOverlay();
-    showError(error.message);
-  });
+    
+    const command = commandsToSend[commandsCompleted];
+    wsCommand.send(JSON.stringify({
+      type: 'command',
+      command: command
+    }));
+    
+    commandsCompleted++;
+    
+    // Send next command after a short delay
+    setTimeout(sendNextCommand, 500);
+  };
+  
+  // Start sending commands
+  sendNextCommand();
 }
 
 function cancelWorldProperties() {
