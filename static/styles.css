@@ -1574,25 +1574,13 @@ button {
 }
 
 /* Add styles for container control buttons and their visibility states */
-.container-controls {
-  background: #2a2a2a;
-  border-radius: 8px;
-  padding-left: 16px;
-  padding-right: 16px;
-  margin-left: 10px;
-  display: flex;
-  flex-direction: column;
-  min-width: 200px;
-}
-
-
-.container-controls .card-content {
+.settings-card.container-controls .card-content {
   overflow: hidden;
   transition: max-height 0.3s ease;
   max-height: 1000px;
 }
 
-.container-controls .card-content.collapsed {
+.settings-card.container-controls .card-content.collapsed {
   max-height: 0;
   padding: 0;
   margin: 0;

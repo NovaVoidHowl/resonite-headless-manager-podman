@@ -48,19 +48,6 @@
       </div>
       <span class="last-updated">Last updated: Never</span>
     </div>
-    <div class="container-controls">
-      <button class="collapsible-header collapsible collapsed" type="button" onclick="toggleCard('container-controls')">
-        <span>Container Controls</span>
-        <span class="collapse-icon">▶</span>
-      </button>
-      <div class="card-content collapsed" id="container-controls">
-        <div class="container-controls-buttons">
-          <button id="startContainer" class="container-control-btn start" onclick="startContainer()">Start</button>
-          <button id="stopContainer" class="container-control-btn stop" onclick="stopContainer()">Stop</button>
-          <button id="restartContainer" class="container-control-btn restart" onclick="restartContainer()">Restart</button>
-        </div>
-      </div>
-    </div>
   </div>
 
   <div class="layout-container">
@@ -72,6 +59,21 @@
     </div>
 
     <div class="sidebar">
+      <!-- Container Controls Card -->
+      <div class="settings-card container-controls">
+        <button class="collapsible-header collapsible collapsed" type="button" onclick="toggleCard('container-controls')">
+          <span>Container Controls</span>
+          <span class="collapse-icon">▶</span>
+        </button>
+        <div class="card-content collapsed" id="container-controls">
+          <div class="container-controls-buttons">
+            <button id="startContainer" class="container-control-btn start" onclick="startContainer()">Start</button>
+            <button id="stopContainer" class="container-control-btn stop" onclick="stopContainer()">Stop</button>
+            <button id="restartContainer" class="container-control-btn restart" onclick="restartContainer()">Restart</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Application Settings Card -->
       <div class="settings-card">
         <button class="collapsible-header collapsible" type="button" onclick="toggleCard('app-settings')">
