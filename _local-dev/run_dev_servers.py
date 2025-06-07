@@ -123,8 +123,6 @@ class ServerRunner:
   def start_api_server(self):
     """Start the API test server."""
     api_path = Path(__file__).parent / ".." / "api" / "local-test"
-    # TODO: Uncomment the line below to use the new test server when ready
-    # command = [sys.executable, "test_server_new.py"] # leave this commented out for future use - DO NOT DELETE
     command = [sys.executable, "test_server.py"]
 
     thread = threading.Thread(
@@ -237,9 +235,9 @@ def main():
     print("Please run this script from the '_local_dev' folder of the resonite-headless-manager repository")
     sys.exit(1)
 
-  if not Path("../api/local-test/test_server_new.py").exists():
+  if not Path("../api/local-test/test_server.py").exists():
     print(f"{ColoredOutput.colorize('❌ Error: API test server not found', 'red')}")
-    print("Expected: api/local-test/test_server_new.py")
+    print("Expected: api/local-test/test_server.py")
     sys.exit(1)
 
   # Start the development environment
