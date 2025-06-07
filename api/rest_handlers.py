@@ -11,7 +11,6 @@ This module provides:
 import json
 import logging
 import os
-from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import HTTPException
@@ -20,13 +19,48 @@ from fastapi.responses import HTMLResponse, JSONResponse
 logger = logging.getLogger(__name__)
 
 
-def load_config() -> Dict[Any, Any]:
-  """Load the headless config file"""
-  config_path = os.getenv('CONFIG_PATH')
-  if not config_path:
-    logger.error("CONFIG_PATH environment variable is not set")
-    raise ValueError("CONFIG_PATH not set in environment variables")
+def get_config_path(data_source=None) -> str:
+  """
+  Get the configuration file path from data source settings or environment.
+  
+  Args:
+      data_source: The data source instance to get settings from
+      
+  Returns:
+      str: Path to the configuration file
+      
+  Raises:
+      ValueError: If no config path can be determined
+  """
+  try:
+    # First try to get config path from data source settings
+    if data_source:
+      try:
+        settings = data_source.get_manger_config_settings()
+        config_folder = settings.get("headless_server", {}).get("config_folder")
+        if config_folder:
+          config_path = os.path.join(config_folder, "Config.json")
+          logger.info("Using config path from data source settings: %s", config_path)
+          return config_path
+      except Exception as e:
+        logger.warning("Failed to get config path from data source: %s, falling back to environment", str(e))
+  except Exception as e:
+    logger.warning("Error accessing data source for config path: %s, falling back to environment", str(e))
 
+  # Fall back to environment variable
+  config_path = os.getenv('CONFIG_PATH')
+  if config_path:
+    logger.info("Using config path from environment: %s", config_path)
+    return config_path
+
+  # Final fallback for development/testing
+  logger.warning("No config path found, using default fallback")
+  raise ValueError("CONFIG_PATH not set in environment variables and no data source settings available")
+
+
+def load_config(data_source=None) -> Dict[Any, Any]:
+  """Load the headless config file"""
+  config_path = get_config_path(data_source)
   logger.info("Attempting to load config from: %s", config_path)
 
   try:
@@ -40,11 +74,9 @@ def load_config() -> Dict[Any, Any]:
     raise ValueError(f"Error loading config: {str(e)}") from e
 
 
-def save_config(config_data: Dict[Any, Any]) -> None:
+def save_config(config_data: Dict[Any, Any], data_source=None) -> None:
   """Save the headless config file"""
-  config_path = os.getenv('CONFIG_PATH')
-  if not config_path:
-    raise ValueError("CONFIG_PATH not set in environment variables")
+  config_path = get_config_path(data_source)
 
   try:
     json.dumps(config_data)
@@ -64,13 +96,12 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
       data_source: Data source instance for container operations (BaseDataSource)
       templates_path: Path to templates directory (default: "templates")
   """
-  @app.get("/", include_in_schema=False) # Main web interface, note do not add openapi metadata here
+  @app.get("/", include_in_schema=False)  # Main web interface, note do not add openapi metadata here
   async def get_root():
     """Serve the main web interface HTML page.
 
     Returns:
-        HTMLResponse: The rendered api-index.html template
-    """
+        HTMLResponse: The rendered api-index.html template    """
     template_path = f"{templates_path}/api-index.html"
     try:
       with open(template_path, encoding='utf-8') as f:
@@ -79,7 +110,7 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
       logger.error("Template not found: %s", template_path)
       return HTMLResponse(
           content=f"<html><body><h1>API Server Running</h1>"
-                 f"<p>Template not found: {template_path}</p></body></html>",
+                  f"<p>Template not found: {template_path}</p></body></html>",
           status_code=200
       )
 
@@ -94,8 +125,8 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
   async def get_config():
     """Get the current headless config"""
     try:
-      result = load_config()
-      return JSONResponse(content=result)
+      result = load_config(data_source)
+      return JSONResponse(content=result)    
     except ValueError as e:
       logger.error("Error in get_config endpoint: %s", str(e))
       raise HTTPException(status_code=500, detail=str(e)) from e
@@ -114,7 +145,7 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
   async def update_config(config_data: Dict[Any, Any]):
     """Update the headless config"""
     try:
-      save_config(config_data)
+      save_config(config_data, data_source)
       return JSONResponse(content={"message": "Config updated successfully"})
     except ValueError as e:
       raise HTTPException(status_code=400, detail=str(e)) from e

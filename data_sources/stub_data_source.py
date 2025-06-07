@@ -255,7 +255,7 @@ class StubDataSource(BaseDataSource):
         "listbans_interval": 60
       },
       "headless_server": {
-        "config_folder": "../_stub_headless/"
+        "config_folder": "../../_stub_headless/"
       }
     }
 
