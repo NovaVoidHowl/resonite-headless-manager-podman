@@ -64,8 +64,7 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
       data_source: Data source instance for container operations (BaseDataSource)
       templates_path: Path to templates directory (default: "templates")
   """
-
-  @app.get("/")
+  @app.get("/", include_in_schema=False) # Main web interface, note do not add openapi metadata here
   async def get_root():
     """Serve the main web interface HTML page.
 
@@ -80,11 +79,18 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
       logger.error("Template not found: %s", template_path)
       return HTMLResponse(
           content=f"<html><body><h1>API Server Running</h1>"
-                 f"<p>Template not found: {template_path}</p></body></html>", 
+                 f"<p>Template not found: {template_path}</p></body></html>",
           status_code=200
       )
 
-  @app.get("/config")
+  @app.get("/api/headless/config",
+           summary="Get Configuration",
+           description="Retrieve the current headless server configuration",
+           tags=["Headless Instance Configuration"],
+           responses={
+               200: {"description": "Configuration retrieved successfully"},
+               500: {"description": "Error loading configuration"}
+           })
   async def get_config():
     """Get the current headless config"""
     try:
@@ -97,7 +103,14 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
       logger.error("Unexpected error in get_config endpoint: %s", str(e))
       raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}") from e
 
-  @app.post("/config")
+  @app.post("/api/headless/config",
+            summary="Update Configuration",
+            description="Update the headless server configuration",
+            tags=["Headless Instance Configuration"],
+            responses={
+                200: {"description": "Configuration updated successfully"},
+                400: {"description": "Invalid configuration data"}
+            })
   async def update_config(config_data: Dict[Any, Any]):
     """Update the headless config"""
     try:
@@ -106,22 +119,14 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
     except ValueError as e:
       raise HTTPException(status_code=400, detail=str(e)) from e
 
-  @app.post("/api/world-properties")
-  async def update_world_properties(data: dict):
-    """Update world properties"""
-    try:
-      session_id = data.get('sessionId')
-      if not session_id:
-        raise HTTPException(status_code=400, detail="Session ID is required")
-
-      return JSONResponse(content={"message": "Properties updated successfully"})
-    except (ValueError, KeyError) as e:
-      raise HTTPException(status_code=400, detail=str(e)) from e
-    except (ConnectionError, RuntimeError) as e:
-      logger.error("Error updating world properties: %s", str(e))
-      raise HTTPException(status_code=500, detail=str(e)) from e
-
-  @app.post("/api/restart-container")
+  @app.post("/api/restart-container",
+            summary="Restart Container",
+            description="Restart the Docker container running the headless server",
+            tags=["Container Control"],
+            responses={
+                200: {"description": "Container restart initiated successfully"},
+                500: {"description": "Error restarting container"}
+            })
   async def restart_container():
     """Restart the Docker container"""
     try:
@@ -131,7 +136,14 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
       logger.error("Error restarting container: %s", str(e))
       raise HTTPException(status_code=500, detail=str(e)) from e
 
-  @app.post("/api/start-container")
+  @app.post("/api/start-container",
+            summary="Start Container",
+            description="Start the Docker container running the headless server",
+            tags=["Container Control"],
+            responses={
+                200: {"description": "Container start initiated or already running"},
+                500: {"description": "Error starting container"}
+            })
   async def start_container():
     """Start the Docker container"""
     try:
@@ -143,7 +155,14 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
       logger.error("Error starting container: %s", str(e))
       raise HTTPException(status_code=500, detail=str(e)) from e
 
-  @app.post("/api/stop-container")
+  @app.post("/api/stop-container",
+            summary="Stop Container",
+            description="Stop the Docker container running the headless server",
+            tags=["Container Control"],
+            responses={
+                200: {"description": "Container stop initiated or already stopped"},
+                500: {"description": "Error stopping container"}
+            })
   async def stop_container():
     """Stop the Docker container"""
     try:
@@ -155,7 +174,14 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
       logger.error("Error stopping container: %s", str(e))
       raise HTTPException(status_code=500, detail=str(e)) from e
 
-  @app.get("/api/config/status")
+  @app.get("/api/manager/config/status",
+           summary="Get Config Status",
+           description="Get whether the app is using builtin or config file settings",
+           tags=["Manager App Configuration"],
+           responses={
+               200: {"description": "Configuration status retrieved successfully"},
+               500: {"description": "Error retrieving configuration status"}
+           })
   async def get_config_status():
     """Get whether the app is using builtin or config file settings"""
     try:
@@ -165,7 +191,14 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
       logger.error("Error in get_config_status endpoint: %s", str(e))
       raise HTTPException(status_code=500, detail=str(e)) from e
 
-  @app.get("/api/config/settings")
+  @app.get("/api/manager/config/settings",
+           summary="Get Config Settings",
+           description="Get current configuration settings",
+           tags=["Manager App Configuration"],
+           responses={
+               200: {"description": "Configuration settings retrieved successfully"},
+               500: {"description": "Error retrieving configuration settings"}
+           })
   async def get_config_settings():
     """Get current configuration settings"""
     try:
@@ -175,7 +208,14 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
       logger.error("Error in get_config_settings endpoint: %s", str(e))
       raise HTTPException(status_code=500, detail=str(e)) from e
 
-  @app.post("/api/config/generate")
+  @app.post("/api/manager/config/generate",
+            summary="Generate Config File",
+            description="Generate config file and switch to using it",
+            tags=["Manager App Configuration"],
+            responses={
+                200: {"description": "Config file generated successfully"},
+                500: {"description": "Error generating config file"}
+            })
   async def generate_config():
     """Generate config file and switch to using it"""
     try:

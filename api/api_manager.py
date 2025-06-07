@@ -18,6 +18,7 @@ from websocket_handlers import create_websocket_endpoints
 logger = logging.getLogger(__name__)
 default_server_ip = "127.0.0.1"
 
+
 class APIManager:
   """
   Manages the FastAPI application with REST and WebSocket endpoints.
@@ -32,15 +33,16 @@ class APIManager:
 
     Args:
         data_source: The data source implementation (BaseDataSource)
-        templates_path: Path to templates directory (default: "templates")
-    """
+        templates_path: Path to templates directory (default: "templates")    """
     self.data_source = data_source
     self.templates_path = templates_path
     self.app = FastAPI(
         title="Resonite Headless Manager API",
         description="WebSocket and REST API for managing Resonite headless servers",
-        version="1.0.0"
-    )# set default server IP
+        version="0.0.1-dev",
+        redoc_url=None  # Disable ReDoc endpoint
+    )
+    # set default server IP
     self.server_ip = default_server_ip
     # get server ip from config.json file
     # open config.json and read the server_ip field
@@ -94,6 +96,7 @@ class APIManager:
         "get_container_status": self._handle_container_status_command,
         "command": self._handle_general_command
     }
+
   def _setup_endpoints(self):
     """Set up all REST and WebSocket endpoints."""
     # Create REST endpoints
