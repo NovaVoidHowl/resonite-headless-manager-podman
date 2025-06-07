@@ -169,26 +169,6 @@ body {
   align-self: flex-start;
 }
 
-.world-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-end;
-  text-align: right;
-}
-
-.world-stats .users-count {
-  font-weight: 600;
-  color: #4CAF50;
-  font-size: 1.1em;
-}
-
-.world-stats .uptime {
-  font-size: 0.9em;
-  color: #ccc;
-  font-family: 'Roboto Mono', monospace;
-}
-
 .world-item .world-details {
   display: flex;
   flex-direction: column;
@@ -197,15 +177,25 @@ body {
 
 .world-info {
   display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.6em;
+
+}
+.world-info-two-per-row {
+  display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 0.6em;
 }
 
 .info-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 0;
+  border-bottom: 0.05em;
+  border-bottom-color: #4a4a4a;
+  border-bottom-style: groove;
+  padding-bottom: 0.2em;
+
 }
 
 .info-row .label {
@@ -215,7 +205,7 @@ body {
 }
 
 .info-row .value {
-  font-weight: 600;
+  font-weight: 200;
   color: #fff;
   text-align: right;
 }
@@ -225,7 +215,6 @@ body {
   gap: 10px;
   margin-top: 8px;
   padding-top: 12px;
-  border-top: 1px solid #4a4a4a;
 }
 
 .select-world-btn,

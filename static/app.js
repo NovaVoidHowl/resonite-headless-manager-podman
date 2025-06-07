@@ -377,10 +377,6 @@ function updateWorlds(worlds, timestamp, cached = false) {
         <h3>${world.name || 'Unnamed World'}</h3>
         <span class="session-id" title="Session ID: ${world.sessionId}">${world.sessionId}</span>
       </div>
-      <div class="world-stats">
-        <span class="users-count">${users}/${maxUsers} users</span>
-        <span class="uptime">${world.uptime || 'Unknown'}</span>
-      </div>
     `;
     
     // Create world details - handle both old and new data structure
@@ -392,10 +388,14 @@ function updateWorlds(worlds, timestamp, cached = false) {
     const mobileFriendly = world.mobile_friendly !== undefined ? world.mobile_friendly : world.mobileFriendly;
     
     worldDetails.innerHTML = `
-      <div class="world-info">
+      <div class="world-info-two-per-row">
         <div class="info-row">
-          <span class="label">Access Level:</span>
-          <span class="value">${accessLevel}</span>
+          <span class="label">Users:</span>
+          <span class="value">${users}/${maxUsers}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Uptime:</span>
+          <span class="value">${world.uptime || 'Unknown'}</span>
         </div>
         <div class="info-row">
           <span class="label">Hidden:</span>
@@ -405,8 +405,15 @@ function updateWorlds(worlds, timestamp, cached = false) {
           <span class="label">Mobile Friendly:</span>
           <span class="value">${mobileFriendly ? 'Yes' : 'No'}</span>
         </div>
-        ${world.description ? `<div class="info-row"><span class="label">Description:</span><span class="value">${world.description}</span></div>` : ''}
+      </div>
+      <div class="world-info">
+        <div class="info-row">
+          <span class="label">Access Level:</span>
+          <span class="value">${accessLevel}</span>
+        </div>
+        
         ${world.tags ? `<div class="info-row"><span class="label">Tags:</span><span class="value">${world.tags}</span></div>` : ''}
+        ${world.description ? `<div class="info-row"><span class="label">Description:</span><span class="value">${world.description}</span></div>` : ''}
       </div>
       <div class="world-actions">
         <button onclick="selectWorld(${index})" class="select-world-btn">Select World</button>
