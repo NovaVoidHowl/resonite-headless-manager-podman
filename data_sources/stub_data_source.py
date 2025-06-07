@@ -54,15 +54,10 @@ class StubDataSource(BaseDataSource):
         "Desert Oasis", "Arctic Station", "Volcano Base", "Cloud Kingdom"
     ]
     self.banned_users = [
-        {"username": "TrollUser123", "id": "U-troll123", "reason": "Harassment"},
-        {"username": "SpamBot", "id": "U-spam456", "reason": "Spamming"},
-        {"username": "BadActor", "id": "U-bad789", "reason": "Inappropriate content"}
+        {"[0]   username: SpamUser123   UserID: U-spam123   MachineIds: 668flj393aokshiwjgmy"},
+        {"[0]   username: TrollUser456  UserID: U-troll456  MachineIds: b67d23f456a789c123e4"}
     ]
-    self.friend_requests = [
-        {"username": "NewFriend1", "id": "U-friend001"},
-        {"username": "BestBuddy", "id": "U-friend002"},
-        {"username": "CoolPlayer", "id": "U-friend003"}
-    ]
+    self.friend_requests = ["NewUser789", "AnotherUser321"]
 
     # Initialize with some sample log entries
     self._generate_initial_logs()
@@ -193,13 +188,10 @@ class StubDataSource(BaseDataSource):
               "2. Bob_Builder (Builder) - 32m\n"
               "3. Charlie_Explorer (Guest) - 15m")
     elif command == "listbans":
-      return ("Banned Users:\n"
-              "1. SpamUser123 - Reason: Spam - Date: 2025-05-30\n"
-              "2. TrollUser456 - Reason: Griefing - Date: 2025-05-28")
+      return ("[0]\tUsername: SpamUser123\tUserID: U-spam123\tMachineIds: a45f8d9e334c9b7a99d1\n"
+              "[1]\tUsername: TrollUser456\tUserID: U-troll456\tMachineIds: b67d23f456a789c123e4")
     elif command == "friendRequests":
-      return ("Friend Requests:\n"
-              "1. NewUser789 wants to be friends with Alice_VR\n"
-              "2. AnotherUser321 wants to be friends with Bob_Builder")
+      return "NewUser789\nAnotherUser321"
     elif command.startswith("save"):
       return "World saved successfully"
     elif command.startswith("kick"):
@@ -393,12 +385,11 @@ class StubDataSource(BaseDataSource):
         "useBinaryTransport": True,
         "maxUploadSpeed": 10000000
     }
-
   def get_banned_users(self) -> List[Dict[str, Any]]:
     """Get banned users list matching test server format."""
     return self.banned_users.copy()
 
-  def get_friend_requests(self) -> List[Dict[str, Any]]:
+  def get_friend_requests(self) -> List[str]:
     """Get friend requests list matching test server format."""
     return self.friend_requests.copy()
 
