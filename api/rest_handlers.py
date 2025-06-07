@@ -68,7 +68,7 @@ def create_rest_endpoints(app, data_source):
     """Serve the main web interface HTML page.
 
     Returns:
-        HTMLResponse: The rendered index.html template
+        HTMLResponse: The rendered api-index.html template
     """
     with open("templates/api-index.html", encoding='utf-8') as f:
       return HTMLResponse(content=f.read())

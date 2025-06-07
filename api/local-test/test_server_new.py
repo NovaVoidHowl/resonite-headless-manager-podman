@@ -20,16 +20,22 @@ The server will start on http://localhost:8000 with the same API structure
 as the production system.
 """
 
-from data_sources.factory import DataSourceFactory
-from api_manager import APIManager
 import os
 import sys
 import logging
 import uvicorn
 
 # Add parent directories to path to import our modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'data_sources'))
+current_dir = os.path.dirname(__file__)
+api_dir = os.path.join(current_dir, '..')
+root_dir = os.path.join(current_dir, '..', '..')
+
+sys.path.insert(0, api_dir)
+sys.path.insert(0, root_dir)
+
+# Now import our modules after path setup
+from data_sources.factory import DataSourceFactory
+from api_manager import APIManager
 
 
 # Configure logging
@@ -71,7 +77,6 @@ def main():
   print("=" * 70)
   print("Using production API infrastructure with stub data source...")
   print("Server will be available at: http://localhost:8000")
-  print("API documentation: http://localhost:8000/docs")
   print("Press Ctrl+C to stop")
   print("=" * 70 + "\n")
 
@@ -81,7 +86,7 @@ def main():
   # Start the server
   uvicorn.run(
       app,
-      host="0.0.0.0",
+      host="127.0.0.1",
       port=8000,
       log_level="info",
       access_log=True

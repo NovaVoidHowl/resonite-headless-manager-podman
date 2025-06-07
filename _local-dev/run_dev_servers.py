@@ -16,7 +16,7 @@ Usage:
     python run_dev_servers.py
 
 The servers will be available at:
-- API Server: http://localhost:8000 (with API docs at /docs)
+- API Server: http://localhost:8000
 - Web UI: http://localhost:8080
 """
 
@@ -197,7 +197,6 @@ Starting development environment with:
     print(f"\n{ColoredOutput.colorize('✅ Servers should be starting up...', 'green')}")
     print(f"{ColoredOutput.colorize('🌐 Web UI:', 'green')} http://localhost:8080")
     print(f"{ColoredOutput.colorize('🔧 API Server:', 'cyan')} http://localhost:8000")
-    print(f"{ColoredOutput.colorize('📚 API Docs:', 'cyan')} http://localhost:8000/docs")
     print(f"\n{ColoredOutput.colorize('📝 Server logs:', 'yellow')}")
     print("-" * 50)
 
