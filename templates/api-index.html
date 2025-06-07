@@ -573,238 +573,28 @@
 }</div>
                 </div>
             </div>
-        </div>
-
-        <!-- REST API Endpoints -->
-        <div class="endpoint-group">
+        </div>        <!-- REST API Endpoints (Dynamically Loaded) -->
+        <div class="endpoint-group" id="rest-endpoints">
             <div class="group-header">
                 <h3>REST API Endpoints</h3>
-                <p>HTTP endpoints for configuration and container management</p>
-            </div>            <div class="endpoint">
-                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
-                    <span class="method get">GET</span>
-                    <span class="endpoint-path">/</span>
-                    <span class="endpoint-summary">Serve main web interface</span>
-                    <span class="toggle-icon">▼</span>
-                </button>
-                <div class="endpoint-details">
-                    <h4>Description</h4>
-                    <p>Returns the main web interface HTML page.</p>
-                    
-                    <div class="responses">
-                        <div class="response">
-                            <span class="response-code">200 OK</span>
-                            <div class="response-description">HTML page content</div>
-                        </div>
-                    </div>
-                </div>
-            </div>            <div class="endpoint">
-                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
-                    <span class="method get">GET</span>
-                    <span class="endpoint-path">/config</span>
-                    <span class="endpoint-summary">Get headless server configuration</span>
-                    <span class="toggle-icon">▼</span>
-                </button>
-                <div class="endpoint-details">
-                    <h4>Description</h4>
-                    <p>Retrieve the current headless server configuration.</p>
-                    
-                    <div class="responses">
-                        <div class="response">
-                            <span class="response-code">200 OK</span>
-                            <div class="response-description">Configuration data in JSON format</div>
-                        </div>
-                    </div>
-                </div>
-            </div>            <div class="endpoint">
-                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
-                    <span class="method post">POST</span>
-                    <span class="endpoint-path">/config</span>
-                    <span class="endpoint-summary">Update headless server configuration</span>
-                    <span class="toggle-icon">▼</span>
-                </button>
-                <div class="endpoint-details">
-                    <h4>Description</h4>
-                    <p>Update the headless server configuration with new settings.</p>
-                    
-                    <h4>Request Body</h4>
-                    <div class="code-block">{
-  "configProperty": "value",
-  "anotherProperty": "anotherValue"
-}</div>
-
-                    <div class="responses">
-                        <div class="response">
-                            <span class="response-code">200 OK</span>
-                            <div class="response-description">Configuration updated successfully</div>
-                        </div>
-                    </div>
-                </div>
-            </div>            <div class="endpoint">
-                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
-                    <span class="method get">GET</span>
-                    <span class="endpoint-path">/api/config/status</span>
-                    <span class="endpoint-summary">Check configuration file status</span>
-                    <span class="toggle-icon">▼</span>
-                </button>
-                <div class="endpoint-details">
-                    <h4>Description</h4>
-                    <p>Check if the system is using a config file or built-in settings.</p>
-                    
-                    <h4>Response Example</h4>
-                    <div class="code-block">{
-  "using_config_file": true
-}</div>
-                </div>
-            </div>            <div class="endpoint">
-                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
-                    <span class="method get">GET</span>
-                    <span class="endpoint-path">/api/config/settings</span>
-                    <span class="endpoint-summary">Get current configuration settings</span>
-                    <span class="toggle-icon">▼</span>
-                </button>
-                <div class="endpoint-details">
-                    <h4>Description</h4>
-                    <p>Retrieve current configuration settings including cache intervals.</p>
-                    
-                    <h4>Response Example</h4>
-                    <div class="code-block">{
-  "using_config_file": true,
-  "config_file_path": "config.json",
-  "settings": {
-    "cache": {
-      "worlds_interval": 10,
-      "status_interval": 10,
-      "sessionurl_interval": 30,
-      "sessionid_interval": 30,
-      "users_interval": 5,
-      "listbans_interval": 60
-    }
-  }
-}</div>
-                </div>
-            </div>            <div class="endpoint">
-                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
-                    <span class="method post">POST</span>
-                    <span class="endpoint-path">/api/config/generate</span>
-                    <span class="endpoint-summary">Generate config file</span>
-                    <span class="toggle-icon">▼</span>
-                </button>
-                <div class="endpoint-details">
-                    <h4>Description</h4>
-                    <p>Generate a new config.json file if it doesn't exist.</p>
-                    
-                    <h4>Response Examples</h4>
-                    <div class="code-block">{
-  "status": "created",
-  "message": "Generated new config file at config.json"
-}</div>
-                    
-                    <div class="code-block">{
-  "status": "unchanged",
-  "message": "Config file already exists and is being used"
-}</div>
-                </div>
-            </div>            <div class="endpoint">
-                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
-                    <span class="method post">POST</span>
-                    <span class="endpoint-path">/api/world-properties</span>
-                    <span class="endpoint-summary">Update world properties</span>
-                    <span class="toggle-icon">▼</span>
-                </button>
-                <div class="endpoint-details">
-                    <h4>Description</h4>
-                    <p>Update properties for a specific world. Requires session ID.</p>
-                    
-                    <h4>Request Body</h4>
-                    <div class="code-block">{
-  "sessionId": "S-xxx",
-  "properties": {
-    "name": "New World Name",
-    "description": "Updated description",
-    "maxUsers": 20
-  }
-}</div>
-
-                    <div class="responses">
-                        <div class="response">
-                            <span class="response-code">200 OK</span>
-                            <div class="response-description">World properties updated successfully</div>
-                        </div>
-                    </div>
-                </div>
-            </div>            <div class="endpoint">
-                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
-                    <span class="method post">POST</span>
-                    <span class="endpoint-path">/api/start-container</span>
-                    <span class="endpoint-summary">Start the container</span>
-                    <span class="toggle-icon">▼</span>
-                </button>
-                <div class="endpoint-details">
-                    <h4>Description</h4>
-                    <p>Start the Resonite headless container.</p>
-                    
-                    <div class="responses">
-                        <div class="response">
-                            <span class="response-code">200 OK</span>
-                            <div class="response-description">Container started successfully</div>
-                        </div>
-                    </div>
-                </div>
-            </div>            <div class="endpoint">
-                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
-                    <span class="method post">POST</span>
-                    <span class="endpoint-path">/api/stop-container</span>
-                    <span class="endpoint-summary">Stop the container</span>
-                    <span class="toggle-icon">▼</span>
-                </button>
-                <div class="endpoint-details">
-                    <h4>Description</h4>
-                    <p>Stop the Resonite headless container.</p>
-                    
-                    <div class="responses">
-                        <div class="response">
-                            <span class="response-code">200 OK</span>
-                            <div class="response-description">Container stopped successfully</div>
-                        </div>
-                    </div>
-                </div>
-            </div>            <div class="endpoint">
-                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
-                    <span class="method post">POST</span>
-                    <span class="endpoint-path">/api/restart-container</span>
-                    <span class="endpoint-summary">Restart the container</span>
-                    <span class="toggle-icon">▼</span>
-                </button>
-                <div class="endpoint-details">
-                    <h4>Description</h4>
-                    <p>Restart the Resonite headless container.</p>
-                    
-                    <div class="responses">
-                        <div class="response">
-                            <span class="response-code">200 OK</span>
-                            <div class="response-description">Container restarted successfully</div>
-                        </div>
-                    </div>
-                </div>
+                <p>HTTP endpoints for configuration and container management (loaded from OpenAPI)</p>
+            </div>            <div class="loading-indicator" style="padding: 2rem; text-align: center; color: #666;">
+                Loading REST endpoints from OpenAPI schema...
             </div>
+        </div>
+
+        <!-- Dynamic REST endpoints will be inserted here -->
         </div>
 
         <!-- Try It Out Section -->
         <div class="try-it-section">
             <h3>Try It Out</h3>
             <p>Test the API endpoints directly from this interface.</p>
-            
-            <div class="form-group">
+              <div class="form-group">
                 <label for="endpoint-select">Select Endpoint:</label>
                 <select id="endpoint-select" onchange="updateTryItForm()">
                     <option value="">Select an endpoint...</option>
-                    <option value="GET:/api/config/status">GET /api/config/status</option>
-                    <option value="GET:/api/config/settings">GET /api/config/settings</option>
-                    <option value="POST:/api/config/generate">POST /api/config/generate</option>
-                    <option value="POST:/api/start-container">POST /api/start-container</option>
-                    <option value="POST:/api/stop-container">POST /api/stop-container</option>
-                    <option value="POST:/api/restart-container">POST /api/restart-container</option>
+                    <!-- Options will be dynamically populated from OpenAPI schema -->
                 </select>
             </div>
             
@@ -847,16 +637,193 @@
             
             <div class="response-output" id="ws-output">WebSocket messages will appear here...</div>
         </div>
-    </div>
-
-    <script>
+    </div>    <script>
         let currentWebSocket = null;
+        let openApiSchema = null;
+
+        // Load OpenAPI schema and populate REST endpoints
+        async function loadOpenApiEndpoints() {
+            try {
+                const response = await fetch('/openapi.json');
+                openApiSchema = await response.json();
+                
+                const restEndpointsContainer = document.getElementById('rest-endpoints');
+                const loadingIndicator = restEndpointsContainer.querySelector('.loading-indicator');
+                
+                // Remove loading indicator
+                loadingIndicator.remove();
+                
+                // Group endpoints by tags
+                const endpointsByTag = {};
+                
+                Object.entries(openApiSchema.paths).forEach(([path, methods]) => {
+                    Object.entries(methods).forEach(([method, spec]) => {
+                        if (spec.tags && spec.tags.length > 0) {
+                            const tag = spec.tags[0];
+                            if (!endpointsByTag[tag]) {
+                                endpointsByTag[tag] = [];
+                            }
+                            endpointsByTag[tag].push({
+                                path,
+                                method: method.toUpperCase(),
+                                spec
+                            });
+                        }
+                    });
+                });
+                
+                // Render endpoint groups
+                Object.entries(endpointsByTag).forEach(([tag, endpoints]) => {
+                    const groupDiv = document.createElement('div');
+                    groupDiv.className = 'endpoint-group';
+                    
+                    groupDiv.innerHTML = `
+                        <div class="group-header">
+                            <h3>${tag}</h3>
+                            <p>${getTagDescription(tag)}</p>
+                        </div>
+                    `;
+                    
+                    endpoints.forEach(endpoint => {
+                        const endpointDiv = document.createElement('div');
+                        endpointDiv.className = 'endpoint';
+                        endpointDiv.innerHTML = createEndpointHtml(endpoint);
+                        groupDiv.appendChild(endpointDiv);
+                    });
+                    
+                    restEndpointsContainer.appendChild(groupDiv);
+                });
+                
+                // Populate the try-it-out dropdown
+                populateEndpointSelector(endpointsByTag);
+                
+            } catch (error) {
+                console.error('Failed to load OpenAPI schema:', error);
+                const restEndpointsContainer = document.getElementById('rest-endpoints');
+                const loadingIndicator = restEndpointsContainer.querySelector('.loading-indicator');
+                loadingIndicator.innerHTML = `
+                    <p style="color: #dc3545;">
+                        Failed to load REST endpoints from OpenAPI schema. 
+                        Error: ${error.message}
+                    </p>
+                `;
+            }
+        }
+
+        function getTagDescription(tag) {
+          const descriptions = {
+            'Headless Instance Configuration': 'Endpoints for managing headless server configuration',
+            'Container Control': 'Endpoints for managing containers',
+            'Manager App Configuration': 'Endpoints for managing setup and configuration of the Resonite Headless Manager',
+          };
+          return descriptions[tag] || 'API endpoints';
+        }
+
+        function createEndpointHtml(endpoint) {
+            const { path, method, spec } = endpoint;
+            const methodClass = method.toLowerCase();
+            
+            let responsesHtml = '';
+            if (spec.responses) {
+                responsesHtml = '<div class="responses">';
+                Object.entries(spec.responses).forEach(([code, response]) => {
+                    responsesHtml += `
+                        <div class="response">
+                            <span class="response-code">${code} ${getHttpStatusText(code)}</span>
+                            <div class="response-description">${response.description || ''}</div>
+                        </div>
+                    `;
+                });
+                responsesHtml += '</div>';
+            }
+
+            let requestBodyHtml = '';
+            if (method === 'POST' && spec.requestBody) {
+                requestBodyHtml = `
+                    <h4>Request Body</h4>
+                    <div class="code-block">${getRequestBodyExample(spec.requestBody)}</div>
+                `;
+            }
+            
+            return `
+                <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
+                    <span class="method ${methodClass}">${method}</span>
+                    <span class="endpoint-path">${path}</span>
+                    <span class="endpoint-summary">${spec.summary || ''}</span>
+                    <span class="toggle-icon">▼</span>
+                </button>
+                <div class="endpoint-details">
+                    <h4>Description</h4>
+                    <p>${spec.description || spec.summary || 'No description available'}</p>
+                    ${requestBodyHtml}
+                    ${responsesHtml}
+                </div>
+            `;
+        }
+
+        function getHttpStatusText(code) {
+            const statusTexts = {
+                '200': 'OK',
+                '400': 'Bad Request',
+                '500': 'Internal Server Error'
+            };
+            return statusTexts[code] || '';
+        }
+
+        function getRequestBodyExample(requestBody) {
+            // Try to generate a simple example based on the request body schema
+            if (requestBody.content && requestBody.content['application/json']) {
+                const schema = requestBody.content['application/json'].schema;
+                if (schema) {
+                    return JSON.stringify(generateExampleFromSchema(schema), null, 2);
+                }
+            }
+            return '{\n  "example": "request body"\n}';
+        }
+
+        function generateExampleFromSchema(schema) {
+            if (schema.type === 'object' && schema.properties) {
+                const example = {};
+                Object.entries(schema.properties).forEach(([key, prop]) => {
+                    if (prop.type === 'string') {
+                        example[key] = `example_${key}`;
+                    } else if (prop.type === 'number') {
+                        example[key] = 123;
+                    } else if (prop.type === 'boolean') {
+                        example[key] = true;
+                    } else {
+                        example[key] = 'example_value';
+                    }
+                });
+                return example;
+            }
+            return { example: 'data' };
+        }
+
+        function populateEndpointSelector(endpointsByTag) {
+            const select = document.getElementById('endpoint-select');
+            
+            // Clear existing options except the first one
+            while (select.children.length > 1) {
+                select.removeChild(select.lastChild);
+            }
+            
+            Object.entries(endpointsByTag).forEach(([tag, endpoints]) => {
+                endpoints.forEach(endpoint => {
+                    const option = document.createElement('option');
+                    option.value = `${endpoint.method}:${endpoint.path}`;
+                    option.textContent = `${endpoint.method} ${endpoint.path}`;
+                    select.appendChild(option);
+                });
+            });
+        }
+
+        // Load endpoints when page loads
+        document.addEventListener('DOMContentLoaded', loadOpenApiEndpoints);
 
         function toggleEndpoint(element) {
             element.classList.toggle('expanded');
-        }
-
-        function updateTryItForm() {
+        }        function updateTryItForm() {
             const select = document.getElementById('endpoint-select');
             const requestBodyGroup = document.getElementById('request-body-group');
             const requestBody = document.getElementById('request-body');
@@ -864,28 +831,45 @@
             if (select.value.startsWith('POST:')) {
                 requestBodyGroup.style.display = 'block';
                 
-                // Set example request bodies for different endpoints
-                if (select.value === 'POST:/api/world-properties') {
-                    requestBody.value = JSON.stringify({
-                        sessionId: "S-xxx",
-                        properties: {
-                            name: "New World Name",
-                            description: "Updated description",
-                            maxUsers: 20
-                        }
-                    }, null, 2);
-                } else if (select.value === 'POST:/config') {
-                    requestBody.value = JSON.stringify({
-                        configProperty: "value",
-                        anotherProperty: "anotherValue"
-                    }, null, 2);
+                // Get the path from the selected value
+                const [method, path] = select.value.split(':');
+                
+                // Try to get request body example from OpenAPI schema
+                if (openApiSchema && openApiSchema.paths[path] && openApiSchema.paths[path].post) {
+                    const spec = openApiSchema.paths[path].post;
+                    if (spec.requestBody) {
+                        requestBody.value = getRequestBodyExample(spec.requestBody);
+                    } else {
+                        requestBody.value = generateDefaultRequestBody(path);
+                    }
                 } else {
-                    requestBody.value = '';
+                    requestBody.value = generateDefaultRequestBody(path);
                 }
             } else {
                 requestBodyGroup.style.display = 'none';
+                requestBody.value = '';
             }
-        }        function formatJsonResponse(text) {
+        }
+
+        function generateDefaultRequestBody(path) {
+            // Generate default request bodies for known endpoints
+            if (path === '/api/world-properties') {
+                return JSON.stringify({
+                    sessionId: "S-xxx",
+                    properties: {
+                        name: "New World Name",
+                        description: "Updated description",
+                        maxUsers: 20
+                    }
+                }, null, 2);
+            } else if (path === '/config') {
+                return JSON.stringify({
+                    configProperty: "value",
+                    anotherProperty: "anotherValue"
+                }, null, 2);
+            }
+            return '{}';
+        }function formatJsonResponse(text) {
             try {
                 const parsed = JSON.parse(text);
                 return JSON.stringify(parsed, null, 2);
