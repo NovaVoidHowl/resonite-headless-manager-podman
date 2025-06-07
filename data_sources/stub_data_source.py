@@ -6,10 +6,10 @@ without requiring actual container infrastructure, perfect for testing
 and frontend development.
 """
 
-import asyncio
 import logging
 import random
 import time
+import threading
 from datetime import datetime
 from typing import Any, Dict, List, Callable, Optional
 
@@ -54,7 +54,7 @@ class StubDataSource(BaseDataSource):
         "Desert Oasis", "Arctic Station", "Volcano Base", "Cloud Kingdom"
     ]
     self.banned_users = [
-        {"[0]   username: SpamUser123   UserID: U-spam123   MachineIds: 668flj393aokshiwjgmy"},
+        {"[0]   username: SpamUser123   UserID: U-spam123   MachineIds: 668flj393ao9sh8wj9my"},
         {"[0]   username: TrollUser456  UserID: U-troll456  MachineIds: b67d23f456a789c123e4"}
     ]
     self.friend_requests = ["NewUser789", "AnotherUser321"]
@@ -233,7 +233,6 @@ class StubDataSource(BaseDataSource):
           if callback:
             callback(log_entry)
 
-    import threading
     thread = threading.Thread(target=log_generator, daemon=True)
     thread.start()
 
@@ -247,12 +246,17 @@ class StubDataSource(BaseDataSource):
   def get_config_settings(self) -> Dict[str, Any]:
     """Get current configuration settings."""
     return {
-        "container_name": self.container_name,
-        "world_name": "Test World",
-        "max_users": 10,
-        "access_level": "Public",
-        "description": "Test server configuration",
-        "test_mode": True
+      "cache": {
+        "worlds_interval": 10,
+        "status_interval": 10,
+        "sessionurl_interval": 30,
+        "sessionid_interval": 30,
+        "users_interval": 5,
+        "listbans_interval": 60
+      },
+      "headless_server": {
+        "config_folder": "../_stub_headless/"
+      }
     }
 
   def generate_config(self) -> Dict[str, Any]:
