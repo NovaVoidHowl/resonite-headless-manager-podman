@@ -26,19 +26,21 @@ class APIManager:
   for starting/stopping the API with different data sources.
   """
 
-  def __init__(self, data_source):
+  def __init__(self, data_source, templates_path="templates"):
     """
     Initialize the API Manager.
 
     Args:
         data_source: The data source implementation (BaseDataSource)
+        templates_path: Path to templates directory (default: "templates")
     """
     self.data_source = data_source
+    self.templates_path = templates_path
     self.app = FastAPI(
         title="Resonite Headless Manager API",
         description="WebSocket and REST API for managing Resonite headless servers",
         version="1.0.0"
-    )    # set default server IP
+    )# set default server IP
     self.server_ip = default_server_ip
     # get server ip from config.json file
     # open config.json and read the server_ip field
@@ -92,11 +94,10 @@ class APIManager:
         "get_container_status": self._handle_container_status_command,
         "command": self._handle_general_command
     }
-
   def _setup_endpoints(self):
     """Set up all REST and WebSocket endpoints."""
     # Create REST endpoints
-    create_rest_endpoints(self.app, self.data_source)
+    create_rest_endpoints(self.app, self.data_source, self.templates_path)
 
     # Create WebSocket endpoints
     create_websocket_endpoints(

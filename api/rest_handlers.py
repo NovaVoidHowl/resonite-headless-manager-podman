@@ -11,6 +11,7 @@ This module provides:
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import HTTPException
@@ -54,13 +55,14 @@ def save_config(config_data: Dict[Any, Any]) -> None:
     json.dump(config_data, f, indent=2)
 
 
-def create_rest_endpoints(app, data_source):
+def create_rest_endpoints(app, data_source, templates_path="templates"):
   """
   Create all REST API endpoints for the FastAPI app
 
   Args:
       app: FastAPI application instance
       data_source: Data source instance for container operations (BaseDataSource)
+      templates_path: Path to templates directory (default: "templates")
   """
 
   @app.get("/")
@@ -70,8 +72,17 @@ def create_rest_endpoints(app, data_source):
     Returns:
         HTMLResponse: The rendered api-index.html template
     """
-    with open("templates/api-index.html", encoding='utf-8') as f:
-      return HTMLResponse(content=f.read())
+    template_path = f"{templates_path}/api-index.html"
+    try:
+      with open(template_path, encoding='utf-8') as f:
+        return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+      logger.error("Template not found: %s", template_path)
+      return HTMLResponse(
+          content=f"<html><body><h1>API Server Running</h1>"
+                 f"<p>Template not found: {template_path}</p></body></html>", 
+          status_code=200
+      )
 
   @app.get("/config")
   async def get_config():
@@ -109,6 +120,7 @@ def create_rest_endpoints(app, data_source):
     except (ConnectionError, RuntimeError) as e:
       logger.error("Error updating world properties: %s", str(e))
       raise HTTPException(status_code=500, detail=str(e)) from e
+
   @app.post("/api/restart-container")
   async def restart_container():
     """Restart the Docker container"""

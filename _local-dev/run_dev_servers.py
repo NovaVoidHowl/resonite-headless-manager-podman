@@ -87,7 +87,7 @@ class ServerRunner:
       # Set environment to use UTF-8 encoding for Windows
       env = os.environ.copy()
       env['PYTHONIOENCODING'] = 'utf-8'
-      
+
       # Start the process
       process = subprocess.Popen(
           command,
@@ -120,6 +120,7 @@ class ServerRunner:
 
     except Exception as e:
       self.log_with_prefix(process_name, f"Error running server: {e}", 'red')
+
   def start_api_server(self):
     """Start the API test server."""
     api_path = Path(__file__).parent / ".." / "api" / "local-test"
@@ -182,8 +183,7 @@ Starting development environment with:
 {ColoredOutput.colorize('⚡ Quick Start:', 'yellow')}
   1. Wait for both servers to start
   2. Open http://localhost:8080 for the web interface
-  3. Use http://localhost:8000/docs for API documentation
-  4. Press Ctrl+C to stop both servers
+  3. Press Ctrl+C to stop both servers
 
 {ColoredOutput.colorize('=' * 80, 'bold')}
 """

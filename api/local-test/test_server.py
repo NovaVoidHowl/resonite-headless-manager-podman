@@ -24,6 +24,7 @@ import os
 import sys
 import logging
 import uvicorn
+import pathlib
 
 # Add parent directories to path to import our modules
 current_dir = os.path.dirname(__file__)
@@ -52,14 +53,19 @@ def create_test_server():
   """
   logger.info("Creating test server with stub data source...")
 
+  # Calculate the templates path relative to the project root
+  project_root = os.path.join(current_dir, '..', '..')
+  templates_path = os.path.join(project_root, 'templates')
+  logger.info("Using templates path: %s", templates_path)
+
   # Create a stub data source for testing
   data_source = DataSourceFactory.create_data_source(
       source_type="stub",
       container_name="resonite-headless-test"
   )
 
-  # Create the API manager with our stub data source
-  api_manager = APIManager(data_source)
+  # Create the API manager with our stub data source and templates path
+  api_manager = APIManager(data_source, templates_path=templates_path)
 
   # Get the configured FastAPI app
   app = api_manager.get_app()

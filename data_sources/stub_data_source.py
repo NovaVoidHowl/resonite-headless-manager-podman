@@ -204,7 +204,7 @@ class StubDataSource(BaseDataSource):
       user = command.split(' ', 1)[1] if ' ' in command else 'unknown'
       return f"User unbanned successfully: {user}"
     else:
-      return f"Command executed successfully: {command}"
+      return f"Unexpected Command: {command}"
 
   # Log Operations
   def get_container_logs(self) -> str:
@@ -385,6 +385,7 @@ class StubDataSource(BaseDataSource):
         "useBinaryTransport": True,
         "maxUploadSpeed": 10000000
     }
+
   def get_banned_users(self) -> List[Dict[str, Any]]:
     """Get banned users list matching test server format."""
     return self.banned_users.copy()
