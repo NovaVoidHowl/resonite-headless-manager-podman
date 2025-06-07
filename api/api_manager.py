@@ -40,7 +40,8 @@ class APIManager:
         title="Resonite Headless Manager API",
         description="WebSocket and REST API for managing Resonite headless servers",
         version="0.0.1-dev",
-        redoc_url=None  # Disable ReDoc endpoint
+        redoc_url=None,  # Disable ReDoc endpoint
+        docs_url=None  # Disable Swagger UI endpoint
     )
     # set default server IP
     self.server_ip = default_server_ip
