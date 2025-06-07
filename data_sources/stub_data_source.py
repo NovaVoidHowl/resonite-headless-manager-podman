@@ -243,7 +243,7 @@ class StubDataSource(BaseDataSource):
         "using_config_file": True  # Simulate config file usage
     }
 
-  def get_config_settings(self) -> Dict[str, Any]:
+  def get_manger_config_settings(self) -> Dict[str, Any]:
     """Get current configuration settings."""
     return {
       "cache": {

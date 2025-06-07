@@ -132,7 +132,7 @@ class BaseDataSource(ABC):
         pass
 
     @abstractmethod
-    def get_config_settings(self) -> Dict[str, Any]:
+    def get_manger_config_settings(self) -> Dict[str, Any]:
         """
         Get current configuration settings.
         

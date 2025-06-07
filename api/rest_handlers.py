@@ -199,13 +199,13 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
                200: {"description": "Configuration settings retrieved successfully"},
                500: {"description": "Error retrieving configuration settings"}
            })
-  async def get_config_settings():
+  async def get_manger_config_settings():
     """Get current configuration settings"""
     try:
-      result = data_source.get_config_settings()
+      result = data_source.get_manger_config_settings()
       return JSONResponse(content=result)
     except Exception as e:
-      logger.error("Error in get_config_settings endpoint: %s", str(e))
+      logger.error("Error in get_manger_config_settings endpoint: %s", str(e))
       raise HTTPException(status_code=500, detail=str(e)) from e
 
   @app.post("/api/manager/config/generate",
