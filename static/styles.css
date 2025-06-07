@@ -1286,6 +1286,14 @@ button {
   margin-top: 16px;
 }
 
+.ban-item{
+  border-bottom: .05em;
+  border-bottom-color: #4a4a4a;
+  border-bottom-style: groove;
+  padding-bottom: 8px;
+  padding-top: 8px;
+}
+
 .banned-user {
   background-color: #1e1e1e;
   padding: 12px;
