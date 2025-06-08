@@ -62,7 +62,7 @@ class ConnectionManager:
           await connection.send_json(message)
         else:
           self.active_connections.discard(connection)
-      except Exception as e:
+      except (ConnectionError, RuntimeError, ValueError) as e:
         logger.error("Error broadcasting to connection: %s", str(e))
         self.active_connections.discard(connection)
 
@@ -153,15 +153,133 @@ async def monitor_websocket(websocket: WebSocket, callback):
   try:
     while await is_websocket_connected(websocket):
       data = await websocket.receive()
-      if data["type"] == "websocket.receive":
-        if "text" in data:
-          await callback(websocket, data["text"])
+      if data["type"] == "websocket.receive" and "text" in data:
+        await callback(websocket, data["text"])
   except WebSocketDisconnect:
     logger.info("WebSocket disconnected normally")
   except json.JSONDecodeError:
     logger.error("Invalid JSON received")
   except (ConnectionError, RuntimeError) as e:
     logger.error("Error in WebSocket monitoring: %s", str(e))
+
+
+async def _handle_logs_websocket(websocket: WebSocket, data_source):
+  """Handle container logs WebSocket connections"""
+  await logs_manager.connect(websocket)
+
+  try:
+    recent_logs = data_source.get_recent_logs()
+    for log_line in recent_logs:
+      await safe_send_json(websocket, {
+          "type": "container_output",
+          "output": log_line,
+          "timestamp": datetime.now().isoformat()
+      })
+
+    async def stream_callback(output):
+      await logs_manager.broadcast({
+          "type": "container_output",
+          "output": output,
+          "timestamp": datetime.now().isoformat()
+      })
+
+    loop = asyncio.get_running_loop()
+
+    def sync_callback(output):
+      asyncio.run_coroutine_threadsafe(stream_callback(output), loop)
+
+    thread = threading.Thread(
+        target=data_source.monitor_output,
+        args=(sync_callback,),
+        daemon=True
+    )
+    thread.start()
+
+    while await is_websocket_connected(websocket):
+      await asyncio.sleep(1)
+
+  except WebSocketDisconnect:
+    logger.info("Logs WebSocket disconnected normally")
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("Logs WebSocket error: %s", str(e))
+  finally:
+    await logs_manager.disconnect(websocket)
+
+
+async def _handle_message_based_websocket(websocket: WebSocket, manager: ConnectionManager,
+                                          request_locks: dict, command_handlers: dict,
+                                          handler_key: str, endpoint_name: str):
+  """Handle WebSocket connections that process messages with handlers"""
+  await manager.connect(websocket)
+
+  try:
+    while await is_websocket_connected(websocket):
+      async def message_handler(ws, msg):
+        return await handle_websocket_message(
+            ws, msg, request_locks, {handler_key: command_handlers[handler_key]}
+        )
+      await monitor_websocket(websocket, message_handler)
+
+  except WebSocketDisconnect:
+    logger.info("%s WebSocket disconnected normally", endpoint_name)
+  except (ConnectionError, RuntimeError, json.JSONDecodeError) as e:
+    logger.error("%s WebSocket error: %s", endpoint_name, str(e))
+  finally:
+    await manager.disconnect(websocket)
+
+
+async def _handle_heartbeat_websocket(websocket: WebSocket):
+  """Handle heartbeat connections to keep other WebSockets alive"""
+  await websocket.accept()
+  try:
+    while True:
+      await asyncio.sleep(30)  # Send heartbeat every 30 seconds
+      if await is_websocket_connected(websocket):
+        await websocket.send_json({
+            "type": "heartbeat",
+            "timestamp": datetime.now().isoformat()
+        })
+      else:
+        break
+  except WebSocketDisconnect:
+    logger.info("Heartbeat WebSocket disconnected normally")
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("Heartbeat WebSocket error: %s", str(e))
+
+
+async def _handle_monitoring_websocket(websocket: WebSocket, manager: ConnectionManager,
+                                       data_source, update_type: str, data_getter,
+                                       endpoint_name: str):
+  """Handle WebSocket connections that monitor and send periodic updates"""
+  await manager.connect(websocket)
+
+  try:
+    while await is_websocket_connected(websocket):
+      # Get data and send update
+      data = data_getter(data_source)
+
+      if update_type == "cpu":
+        message = {
+            "type": "cpu_update",
+            "cpu_usage": data
+        }
+      else:  # memory
+        message = {
+            "type": "memory_update",
+            "memory_percent": data.get("percent", 0),
+            "memory_used": data.get("used", "0GB"),
+            "memory_total": data.get("total", "0GB")
+        }
+
+      await safe_send_json(websocket, message)
+      await asyncio.sleep(1)  # Update every second
+
+  except WebSocketDisconnect:
+    logger.info("%s WebSocket disconnected normally", endpoint_name)
+  except (ConnectionError, RuntimeError) as e:
+    logger.error("%s WebSocket error: %s", endpoint_name, str(e))
+  finally:
+    await manager.disconnect(websocket)
 
 
 def create_websocket_endpoints(app, data_source, request_locks, command_handlers):
@@ -177,184 +295,60 @@ def create_websocket_endpoints(app, data_source, request_locks, command_handlers
   @app.websocket("/ws/logs")
   async def logs_endpoint(websocket: WebSocket):
     """Handle container logs WebSocket connections"""
-    await logs_manager.connect(websocket)
-
-    try:
-      recent_logs = data_source.get_recent_logs()
-      for log_line in recent_logs:
-        await safe_send_json(websocket, {
-            "type": "container_output",
-            "output": log_line,
-            "timestamp": datetime.now().isoformat()
-        })
-
-      async def stream_callback(output):
-        await logs_manager.broadcast({
-            "type": "container_output",
-            "output": output,
-            "timestamp": datetime.now().isoformat()
-        })
-
-      loop = asyncio.get_running_loop()
-
-      def sync_callback(output):
-        asyncio.run_coroutine_threadsafe(stream_callback(output), loop)
-
-      thread = threading.Thread(
-          target=data_source.monitor_output,
-          args=(sync_callback,),
-          daemon=True
-      )
-      thread.start()
-
-      while await is_websocket_connected(websocket):
-        await asyncio.sleep(1)
-
-    except WebSocketDisconnect:
-      logger.info("Logs WebSocket disconnected normally")
-    except (ConnectionError, RuntimeError) as e:
-      logger.error("Logs WebSocket error: %s", str(e))
-    finally:
-      await logs_manager.disconnect(websocket)
+    await _handle_logs_websocket(websocket, data_source)
 
   @app.websocket("/ws/status")
   async def status_endpoint(websocket: WebSocket):
     """Handle status monitoring WebSocket connections"""
-    await status_manager.connect(websocket)
-
-    try:
-      while await is_websocket_connected(websocket):
-        def message_handler(ws, msg): return handle_websocket_message(
-            ws, msg, request_locks, {"get_status": command_handlers["get_status"]}
-        )
-        await monitor_websocket(websocket, message_handler)
-
-    except WebSocketDisconnect:
-      logger.info("Status WebSocket disconnected normally")
-    except (ConnectionError, RuntimeError, json.JSONDecodeError) as e:
-      logger.error("Status WebSocket error: %s", str(e))
-    finally:
-      await status_manager.disconnect(websocket)
+    await _handle_message_based_websocket(
+        websocket, status_manager, request_locks, command_handlers,
+        "get_status", "Status"
+    )
 
   @app.websocket("/ws/worlds")
   async def worlds_endpoint(websocket: WebSocket):
     """Handle worlds list WebSocket connections"""
-    await worlds_manager.connect(websocket)
-
-    try:
-      while await is_websocket_connected(websocket):
-        def message_handler(ws, msg): return handle_websocket_message(
-            ws, msg, request_locks, {"get_worlds": command_handlers["get_worlds"]}
-        )
-        await monitor_websocket(websocket, message_handler)
-
-    except WebSocketDisconnect:
-      logger.info("Worlds WebSocket disconnected normally")
-    except (ConnectionError, RuntimeError, json.JSONDecodeError) as e:
-      logger.error("Worlds WebSocket error: %s", str(e))
-    finally:
-      await worlds_manager.disconnect(websocket)
+    await _handle_message_based_websocket(
+        websocket, worlds_manager, request_locks, command_handlers,
+        "get_worlds", "Worlds"
+    )
 
   @app.websocket("/ws/command")
   async def command_endpoint(websocket: WebSocket):
     """Handle command WebSocket connections"""
-    await commands_manager.connect(websocket)
-
-    try:
-      while await is_websocket_connected(websocket):
-        def message_handler(ws, msg): return handle_websocket_message(
-            ws, msg, request_locks, {"command": command_handlers["command"]}
-        )
-        await monitor_websocket(websocket, message_handler)
-
-    except WebSocketDisconnect:
-      logger.info("Command WebSocket disconnected normally")
-    except (ConnectionError, RuntimeError, json.JSONDecodeError, KeyError) as e:
-      logger.error("Command WebSocket error: %s", str(e))
-    finally:
-      await commands_manager.disconnect(websocket)
+    await _handle_message_based_websocket(
+        websocket, commands_manager, request_locks, command_handlers,
+        "command", "Command"
+    )
 
   @app.websocket("/ws/heartbeat")
   async def heartbeat_endpoint(websocket: WebSocket):
     """Handle heartbeat connections to keep other WebSockets alive"""
-    await websocket.accept()
-    try:
-      while True:
-        await asyncio.sleep(30)  # Send heartbeat every 30 seconds
-        if await is_websocket_connected(websocket):
-          await websocket.send_json({
-              "type": "heartbeat",
-              "timestamp": datetime.now().isoformat()
-          })
-        else:
-          break
-    except WebSocketDisconnect:
-      logger.info("Heartbeat WebSocket disconnected normally")
-    except (ConnectionError, RuntimeError) as e:
-      logger.error("Heartbeat WebSocket error: %s", str(e))
+    await _handle_heartbeat_websocket(websocket)
+
   @app.websocket("/ws/cpu")
   async def cpu_endpoint(websocket: WebSocket):
     """Handle CPU monitoring WebSocket connections"""
-    await cpu_manager.connect(websocket)
+    await _handle_monitoring_websocket(
+        websocket, cpu_manager, data_source, "cpu",
+        lambda ds: ds.get_cpu_usage(), "CPU"
+    )
 
-    try:
-      while await is_websocket_connected(websocket):
-        # Get CPU usage and send update
-        cpu_usage = data_source.get_cpu_usage()
-        await safe_send_json(websocket, {
-            "type": "cpu_update",
-            "cpu_usage": cpu_usage
-        })
-        await asyncio.sleep(1)  # Update every second
-
-    except WebSocketDisconnect:
-      logger.info("CPU WebSocket disconnected normally")
-    except (ConnectionError, RuntimeError) as e:
-      logger.error("CPU WebSocket error: %s", str(e))
-    finally:
-      await cpu_manager.disconnect(websocket)
   @app.websocket("/ws/memory")
   async def memory_endpoint(websocket: WebSocket):
     """Handle memory monitoring WebSocket connections"""
-    await memory_manager.connect(websocket)
-
-    try:
-      while await is_websocket_connected(websocket):
-        # Get memory usage and send update
-        memory_info = data_source.get_memory_usage()
-        await safe_send_json(websocket, {
-            "type": "memory_update",
-            "memory_percent": memory_info.get("percent", 0),
-            "memory_used": memory_info.get("used", "0GB"),
-            "memory_total": memory_info.get("total", "0GB")
-        })
-        await asyncio.sleep(1)  # Update every second
-
-    except WebSocketDisconnect:
-      logger.info("Memory WebSocket disconnected normally")
-    except (ConnectionError, RuntimeError) as e:
-      logger.error("Memory WebSocket error: %s", str(e))
-    finally:
-      await memory_manager.disconnect(websocket)
+    await _handle_monitoring_websocket(
+        websocket, memory_manager, data_source, "memory",
+        lambda ds: ds.get_memory_usage(), "Memory"
+    )
 
   @app.websocket("/ws/container_status")
   async def container_status_endpoint(websocket: WebSocket):
     """Handle container status WebSocket connections"""
-    await container_status_manager.connect(websocket)
-
-    try:
-      while await is_websocket_connected(websocket):
-        def message_handler(ws, msg): return handle_websocket_message(
-            ws, msg, request_locks, {"get_container_status": command_handlers["get_container_status"]}
-        )
-        await monitor_websocket(websocket, message_handler)
-
-    except WebSocketDisconnect:
-      logger.info("Container Status WebSocket disconnected normally")
-    except (ConnectionError, RuntimeError, json.JSONDecodeError) as e:
-      logger.error("Container Status WebSocket error: %s", str(e))
-    finally:
-      await container_status_manager.disconnect(websocket)
+    await _handle_message_based_websocket(
+        websocket, container_status_manager, request_locks, command_handlers,
+        "get_container_status", "Container Status"
+    )
 
 
 async def send_output(output):
