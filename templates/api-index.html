@@ -367,12 +367,16 @@
                     <p>Send commands to the headless server and receive structured responses.</p>
 
                     <h4>Message Format</h4>
-                    <div class="code-block">{
-  "type": "command",
-  "command": "command_string"
-}</div>
+                    <div class="code-block">
+                      {
+                        "type": "command",
+                        "command": "command_string",
+                        "target_world_instance": "0",
+                        "command_mode": "default"|"direct"
+                      }
+                    </div>
 
-                    <h4>Special Commands</h4>
+                    <h4>Command strings</h4>
                     <div class="parameters">
                         <div class="parameter">
                             <span class="parameter-name">listbans</span>
