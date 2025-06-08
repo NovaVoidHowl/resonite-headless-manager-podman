@@ -96,8 +96,8 @@ The memory endpoint automatically streams memory usage updates every second. No 
 
 ### 3. Container Logs
 
-The logs endpoint automatically streams log updates in real-time. Upon connection, it sends recent logs
-and then streams new logs as they occur.
+The logs endpoint automatically streams log updates in real-time. Upon connection, it sends recent logs and then streams
+new logs as they occur.
 
 ## Response Formats
 

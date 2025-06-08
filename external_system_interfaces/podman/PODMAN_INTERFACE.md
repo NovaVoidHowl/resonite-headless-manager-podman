@@ -2,8 +2,7 @@
 
 ## Overview
 
-The Podman interface provides a clean set of functions that offer direct access to Podman container
-operations.\
+The Podman interface provides a clean set of functions that offer direct access to Podman container operations.\
 This interface is designed to be simple, reliable, and easy to use for managing Resonite headless containers.
 
 ## Requirements
@@ -87,7 +86,7 @@ if container_exists("my-container"):
 ### Container Management Functions
 
 - `start_container(container_name: str) -> bool` - Start a container
-- `stop_container(container_name: str) -> bool` - Stop a container  
+- `stop_container(container_name: str) -> bool` - Stop a container
 - `restart_container(container_name: str) -> bool` - Restart a container
 
 ### Information Functions

@@ -82,7 +82,7 @@ async def example():
         Command(f"focus {world_num}"),
         Command("users")
     ], description=f"Get users in world {world_num}")
-    
+
     result = queue.add_command_block(block)
     execution_result = await result.wait_for_completion()
     print(f"Block result: {execution_result.output}")
@@ -91,7 +91,7 @@ async def example():
     status = queue.get_status()
     print(f"Queue length: {status['queue_length']}")
     print(f"Is processing: {status['is_processing']}")
-    
+
     # Shutdown queue when done
     queue.shutdown()
 
@@ -115,17 +115,17 @@ async def handle_command_request(websocket, command_data):
     """Handle command request from WebSocket"""
     command = command_data.get('command')
     priority = Priority.HIGH if command_data.get('urgent') else Priority.NORMAL
-    
+
     # Add to queue
     result = queue.add_command(command, priority=priority)
-    
+
     # Send response
     await websocket.send_json({
         'type': 'command_queued',
         'queue_id': result.queue_id,
         'position': result.position
     })
-    
+
     # Wait for completion (optional)
     if command_data.get('wait_for_result'):
         final_result = await result.wait_for_completion()
@@ -151,7 +151,7 @@ def get_world_info(world_number):
         Command("sessionUrl")
     ], description=f"Full world {world_number} information")
 
-# Ban user sequence  
+# Ban user sequence
 def ban_user(username, reason="Violation of rules"):
     return CommandBlock([
         Command(f"ban {username} \"{reason}\""),
@@ -211,7 +211,7 @@ CommandQueue(
 #### Methods
 
 - `add_command(command, timeout=30, priority=Priority.NORMAL, description="")` - Add single command
-- `add_command_block(command_block, priority=Priority.NORMAL, description="")` - Add command block  
+- `add_command_block(command_block, priority=Priority.NORMAL, description="")` - Add command block
 - `get_status()` - Get current queue status
 - `clear_queue()` - Clear all pending commands
 - `shutdown()` - Gracefully shutdown the queue
@@ -268,7 +268,7 @@ Result object returned after command execution.
 The queue system provides comprehensive error handling:
 
 - **Timeout Errors**: Commands that exceed their timeout are terminated
-- **Connection Errors**: Container connection issues are handled gracefully  
+- **Connection Errors**: Container connection issues are handled gracefully
 - **Queue Full**: Protection against queue overflow
 - **Invalid Commands**: Validation of command format and parameters
 - **Worker Thread Errors**: Recovery from worker thread failures
@@ -293,7 +293,8 @@ All operations use appropriate locking mechanisms to ensure data consistency.
 
 ## Integration with Existing Systems
 
-The command queue integrates with existing systems by accepting any command executor function that follows the signature:
+The command queue integrates with existing systems by accepting any command executor function that follows the
+signature:
 
 ```python
 def command_executor(container_name: str, command: str, timeout: int) -> str:

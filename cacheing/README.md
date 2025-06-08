@@ -1,7 +1,7 @@
 # Cache Manager
 
-The Cache Manager provides a thread-safe caching system for storing data with timestamps,
-allowing other modules to determine data freshness without repeatedly requesting information through the command queue.
+The Cache Manager provides a thread-safe caching system for storing data with timestamps, allowing other modules to
+determine data freshness without repeatedly requesting information through the command queue.
 
 ## Features
 
@@ -18,8 +18,8 @@ allowing other modules to determine data freshness without repeatedly requesting
 
 ## Installation
 
-No additional installation is required beyond the base project dependencies.
-The cache manager uses only Python standard library modules.
+No additional installation is required beyond the base project dependencies. The cache manager uses only Python standard
+library modules.
 
 ## Quick Start
 
@@ -183,7 +183,7 @@ class CacheEntry:
     ttl_seconds: int            # Time-to-live in seconds (default: 300)
     category: str               # Data category/namespace (default: "default")
     metadata: Dict[str, Any]    # Additional metadata dictionary
-    
+
     # Internal tracking fields
     access_count: int           # How many times accessed
     last_accessed: datetime     # When last accessed
@@ -198,15 +198,15 @@ if entry:
     # Age and TTL information
     age = entry.get_age_seconds()           # Age in seconds
     remaining = entry.get_remaining_ttl()   # Remaining TTL (can be negative)
-    
+
     # Status checks
     is_fresh = entry.is_fresh()             # True if within TTL
     is_expired = entry.is_expired()         # True if older than 2x TTL
-    
+
     # Update tracking
     entry.mark_accessed()                   # Increment access count
     entry.invalidate()                      # Mark as invalid
-    
+
     # Export to dictionary
     entry_dict = entry.to_dict()            # Full entry as dict for JSON
 ```
@@ -304,7 +304,7 @@ def handle_command_result(command: str, result: ExecutionResult):
 async def get_cached_or_fresh_data(websocket, command: str, force_refresh: bool = False):
     cache = get_global_cache()
     cache_key = f"ws_data_{command}"
-    
+
     # Try to get cached data first
     if not force_refresh:
         cached_data = cache.get_data(cache_key, include_stale=True)
@@ -320,7 +320,7 @@ async def get_cached_or_fresh_data(websocket, command: str, force_refresh: bool 
                 "age_seconds": entry.get_age_seconds()
             })
             return
-    
+
     # Get fresh data and cache it
     # ... execute command through queue ...
     # cache.set(cache_key, fresh_data, ...)
@@ -332,10 +332,10 @@ async def get_cached_or_fresh_data(websocket, command: str, force_refresh: bool 
 async def prewarm_cache():
     """Pre-warm frequently accessed data."""
     cache = get_global_cache()
-    
+
     # Pre-load common data
     common_commands = ["users", "worlds", "status"]
-    
+
     for command in common_commands:
         # Execute command and cache result
         # This would be done through your request handler
@@ -505,17 +505,17 @@ for category, ttl in CATEGORIES.items():
 # Monitor and manage cache size
 def monitor_cache_health():
     stats = cache.get_stats()
-    
+
     # Check memory usage
     usage_percent = (stats.total_entries / cache.max_entries) * 100
     if usage_percent > 80:
         print(f"Cache usage high: {usage_percent:.1f}%")
-        
+
     # Check hit rate
     hit_rate = stats.get_hit_rate()
     if hit_rate < 50:
         print(f"Low hit rate: {hit_rate:.1f}% - consider adjusting TTLs")
-        
+
     # Check for too many stale entries
     stale_percent = (stats.stale_entries / stats.total_entries) * 100
     if stale_percent > 25:
@@ -528,21 +528,25 @@ def monitor_cache_health():
 ### Common Issues
 
 1. **Cache Miss on Fresh Data**
+
    - Check if TTL is too short
    - Verify key spelling and case sensitivity
    - Check if data was invalidated
 
 2. **Memory Usage Growing**
+
    - Increase cleanup frequency
    - Reduce max_entries limit
    - Check for data that never expires
 
 3. **Poor Hit Rate**
+
    - Review TTL settings (may be too short)
    - Check if data is being invalidated too often
    - Verify cache keys are consistent
 
 4. **Thread Safety Issues**
+
    - Use the global cache instance
    - Avoid modifying cache entries directly
    - Let the cache manager handle thread synchronization
@@ -642,7 +646,7 @@ Cache Manager Examples
 ==================================================
 === Basic Cache Usage ===
 Data cached successfully: True
-Retrieved data: {'users': [{'name': 'Alice', 'id': 'U-alice123'}, 
+Retrieved data: {'users': [{'name': 'Alice', 'id': 'U-alice123'},
                  {'name': 'Bob', 'id': 'U-bob456'}], 'total_count': 2}
 Data age: 0.0 seconds
 TTL remaining: 30.0 seconds

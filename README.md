@@ -96,6 +96,7 @@ This application provides real-time monitoring and control of your Resonite worl
   - Real-time command output
 
 - **WebSocket API**
+
   - Programmatic control via WebSocket API
   - Structured JSON message format
   - Real-time updates and monitoring

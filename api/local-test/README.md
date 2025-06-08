@@ -40,7 +40,7 @@ python test_server.py
 
 The server will start on `http://localhost:8000` and display:
 
-```
+```shell
 🧪 Resonite Headless Manager API Test Server
 ======================================================================
 Starting test server with dummy data...
@@ -54,31 +54,31 @@ Press Ctrl+C to stop
 
 ### REST API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/` | Main web interface |
-| `GET` | `/config` | Get headless server configuration |
-| `POST` | `/config` | Update headless server configuration |
-| `POST` | `/api/world-properties` | Update world properties |
-| `POST` | `/api/restart-container` | Restart the container |
-| `POST` | `/api/start-container` | Start the container |
-| `POST` | `/api/stop-container` | Stop the container |
-| `GET` | `/api/config/status` | Get config file usage status |
-| `GET` | `/api/config/settings` | Get current configuration settings |
-| `POST` | `/api/config/generate` | Generate new config file |
+| Method | Endpoint                 | Description                          |
+| ------ | ------------------------ | ------------------------------------ |
+| `GET`  | `/`                      | Main web interface                   |
+| `GET`  | `/config`                | Get headless server configuration    |
+| `POST` | `/config`                | Update headless server configuration |
+| `POST` | `/api/world-properties`  | Update world properties              |
+| `POST` | `/api/restart-container` | Restart the container                |
+| `POST` | `/api/start-container`   | Start the container                  |
+| `POST` | `/api/stop-container`    | Stop the container                   |
+| `GET`  | `/api/config/status`     | Get config file usage status         |
+| `GET`  | `/api/config/settings`   | Get current configuration settings   |
+| `POST` | `/api/config/generate`   | Generate new config file             |
 
 ### WebSocket Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
-| `ws://localhost:8000/ws/logs` | Container logs streaming |
-| `ws://localhost:8000/ws/command` | Command execution |
-| `ws://localhost:8000/ws/worlds` | Worlds monitoring |
-| `ws://localhost:8000/ws/cpu` | CPU usage monitoring |
-| `ws://localhost:8000/ws/memory` | Memory usage monitoring |
+| Endpoint                                  | Description              |
+| ----------------------------------------- | ------------------------ |
+| `ws://localhost:8000/ws/logs`             | Container logs streaming |
+| `ws://localhost:8000/ws/command`          | Command execution        |
+| `ws://localhost:8000/ws/worlds`           | Worlds monitoring        |
+| `ws://localhost:8000/ws/cpu`              | CPU usage monitoring     |
+| `ws://localhost:8000/ws/memory`           | Memory usage monitoring  |
 | `ws://localhost:8000/ws/container_status` | Container status updates |
-| `ws://localhost:8000/ws/status` | Server status monitoring |
-| `ws://localhost:8000/ws/heartbeat` | Connection heartbeat |
+| `ws://localhost:8000/ws/status`           | Server status monitoring |
+| `ws://localhost:8000/ws/heartbeat`        | Connection heartbeat     |
 
 ## Dummy Data Generated
 
@@ -152,9 +152,9 @@ const cmdWs = new WebSocket('ws://localhost:8000/ws/command');
 
 cmdWs.onopen = () => {
     // Send a command
-    cmdWs.send(JSON.stringify({ 
-        type: 'command', 
-        command: 'friendRequests' 
+    cmdWs.send(JSON.stringify({
+        type: 'command',
+        command: 'friendRequests'
     }));
 };
 ```
@@ -208,6 +208,7 @@ def __init__(self):
 ### Common Issues
 
 **Import Errors**:
+
 ```bash
 pip install fastapi uvicorn python-multipart
 ```
@@ -229,12 +230,13 @@ pip install fastapi uvicorn python-multipart
 
 ## Production vs Test Server
 
-| Feature | Test Server | Production Server |
-|---------|-------------|-------------------|
-| Data Source | Generated dummy data | Real Podman containers |
-| Container Control | Simulated responses | Actual container operations |
-| Performance | Instant responses | Real operation timing |
-| State Persistence | No persistence | Real state management |
-| Resource Usage | Minimal | Production resource usage |
+| Feature           | Test Server          | Production Server           |
+| ----------------- | -------------------- | --------------------------- |
+| Data Source       | Generated dummy data | Real Podman containers      |
+| Container Control | Simulated responses  | Actual container operations |
+| Performance       | Instant responses    | Real operation timing       |
+| State Persistence | No persistence       | Real state management       |
+| Resource Usage    | Minimal              | Production resource usage   |
 
-The test server is perfect for development and testing, while the production server handles real Resonite headless server management.
+The test server is perfect for development and testing, while the production server handles real Resonite headless
+server management.
