@@ -101,9 +101,7 @@ class APIManager:
   def _setup_endpoints(self):
     """Set up all REST and WebSocket endpoints."""
     # Create REST endpoints
-    create_rest_endpoints(self.app, self.data_source, self.templates_path)
-
-    # Create WebSocket endpoints
+    create_rest_endpoints(self.app, self.data_source, self.templates_path)    # Create WebSocket endpoints
     create_websocket_endpoints(
         self.app,
         self.data_source,
@@ -114,42 +112,44 @@ class APIManager:
     logger.info("API endpoints configured with data source: %s",
                 self.data_source.__class__.__name__)
 
-  async def _handle_status_command(self, websocket, data):
+  async def _handle_status_command(self, websocket, _data):
     """Handle status command via WebSocket."""
     try:
-      # For stub data source, this would return mock status
+      # Get server status from data source
+      server_status = self.data_source.get_server_status()
       status_data = {
           "type": "status_update",
-          "status": "Server running normally",
-          "timestamp": "2025-06-01T12:00:00Z"
+          "status": server_status,
+          "timestamp": server_status.get("server_time", "2025-06-08T12:00:00Z")
       }
       await websocket.send_json(status_data)
-    except Exception as e:
+    except (RuntimeError, AttributeError, KeyError, ValueError, OSError) as e:
       logger.error("Error handling status command: %s", str(e))
       await websocket.send_json({
           "type": "error",
           "message": f"Status command failed: {e}"
       })
 
-  async def _handle_worlds_command(self, websocket, data):
+  async def _handle_worlds_command(self, websocket, _data):
     """Handle worlds command via WebSocket."""
     try:
-      # This would use data_source.send_command("worlds") in the future
-      worlds_data = {
+      # Get worlds data from data source
+      worlds_data = self.data_source.get_worlds_data()
+      response_data = {
           "type": "worlds_update",
-          "worlds_data": [],
-          "timestamp": "2025-06-01T12:00:00Z",
+          "worlds_data": worlds_data,
+          "timestamp": "2025-06-08T12:00:00Z",
           "cached": False
       }
-      await websocket.send_json(worlds_data)
-    except Exception as e:
+      await websocket.send_json(response_data)
+    except (RuntimeError, AttributeError, KeyError, ValueError, OSError) as e:
       logger.error("Error handling worlds command: %s", str(e))
       await websocket.send_json({
           "type": "error",
           "message": f"Worlds command failed: {e}"
       })
 
-  async def _handle_container_status_command(self, websocket, data):
+  async def _handle_container_status_command(self, websocket, _data):
     """Handle container status command via WebSocket."""
     try:
       status = self.data_source.get_container_status()
@@ -157,7 +157,7 @@ class APIManager:
           "type": "container_status_update",
           "status": status
       })
-    except Exception as e:
+    except (RuntimeError, AttributeError, KeyError, ValueError, OSError) as e:
       logger.error("Error handling container status command: %s", str(e))
       await websocket.send_json({
           "type": "error",
@@ -175,16 +175,26 @@ class APIManager:
         })
         return
 
-      # Send command through data source
-      output = self.data_source.send_command(command)
+      target_world_instance = data.get("target_world_instance", None)
+      if not target_world_instance:
+        await websocket.send_json({
+            "type": "error",
+            "message": "No target world instance specified"
+        })
+        return
 
-      await websocket.send_json({
-          "type": "command_response",
-          "command": command,
-          "output": output,
-          "timestamp": "2025-06-01T12:00:00Z"
-      })
-    except Exception as e:
+      command_mode = data.get("command_mode", "default")
+      if command_mode not in ["default", "direct"]:
+        await websocket.send_json({
+            "type": "error",
+            "message": f"Invalid command mode: {command_mode}"
+        })
+        return
+
+      # Use data source to get structured command response
+      response = self.data_source.get_structured_command_response(command, target_world_instance, command_mode)
+      await websocket.send_json(response)
+    except (RuntimeError, AttributeError, KeyError, ValueError, OSError) as e:
       logger.error("Error handling command: %s", str(e))
       await websocket.send_json({
           "type": "error",
@@ -215,5 +225,5 @@ class APIManager:
       logger.info("Shutting down API Manager...")
       self.data_source.cleanup()
       logger.info("API Manager shutdown complete")
-    except Exception as e:
+    except (RuntimeError, AttributeError, OSError) as e:
       logger.error("Error during API Manager shutdown: %s", str(e))
