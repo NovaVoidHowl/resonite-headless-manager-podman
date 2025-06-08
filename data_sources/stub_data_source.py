@@ -10,6 +10,7 @@ import logging
 import random
 import time
 import threading
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Callable, Optional
 
@@ -54,8 +55,9 @@ class StubDataSource(BaseDataSource):
         "Desert Oasis", "Arctic Station", "Volcano Base", "Cloud Kingdom"
     ]
     self.banned_users = [
-        {"[0]   username: SpamUser123   UserID: U-spam123   MachineIds: 668flj393ao9sh8wj9my"},
-        {"[0]   username: TrollUser456  UserID: U-troll456  MachineIds: b67d23f456a789c123e4"}
+        "[0]   Username: SpamUser123   UserID: U-spam123   MachineIds: 668flj393ao9sh8wj9my",
+        "[BBdEEDS]   Username: Spam User 123   UserID: U-spam123   MachineIds: 668flj393ao9sh8wj9my",
+        "[1]   Username: TrollUser456  UserID: U-troll456  MachineIds: b67d23f456a789c123e4"
     ]
     self.friend_requests = ["NewUser789", "AnotherUser321"]
 
@@ -86,10 +88,7 @@ class StubDataSource(BaseDataSource):
         f"[{datetime.now().strftime('%H:%M:%S')}] User left: {random.choice(self.user_names)}",
         f"[{datetime.now().strftime('%H:%M:%S')}] World save completed",
         f"[{datetime.now().strftime('%H:%M:%S')}] Network sync update",
-        f"[{datetime.now().strftime('%H:%M:%S')}] Asset cache refreshed",
-        f"[{datetime.now().strftime('%H:%M:%S')}] Physics step: 60 FPS",
-        f"[{datetime.now().strftime('%H:%M:%S')}] Memory usage: {self.get_memory_usage()['percent']}%",
-        f"[{datetime.now().strftime('%H:%M:%S')}] CPU usage: {self.get_cpu_usage():.1f}%"
+        f"[{datetime.now().strftime('%H:%M:%S')}] Asset cache refreshed"
     ]
     return random.choice(log_types)
 
@@ -144,7 +143,7 @@ class StubDataSource(BaseDataSource):
       time.sleep(1)  # Simulate restart delay
       self.start_container()
       return True
-    except Exception as e:
+    except (OSError, RuntimeError) as e:
       logger.error("Failed to restart container: %s", e)
       return False
 
@@ -166,7 +165,7 @@ class StubDataSource(BaseDataSource):
       }
 
   # Command Operations
-  def send_command(self, command: str, timeout: int = 10, use_cache: bool = True) -> str:
+  def send_command(self, command: str, _timeout: int = 10, _use_cache: bool = True) -> str:
     """Send a command to the container with responses matching test server format."""
     if not self._container_running:
       return "Error: Container is not running"
@@ -177,22 +176,50 @@ class StubDataSource(BaseDataSource):
     time.sleep(random.uniform(0.1, 0.5))
 
     # Generate realistic responses based on command matching test server
-    if command == "status":
-      return ("Server Status: Running\n"
-              "Uptime: 2h 30m\n"
-              "Active Users: 3\n"
-              "World: Crystal Caverns")
-    elif command == "users":
-      return ("Connected Users:\n"
-              "1. Alice_VR (Admin) - 45m\n"
-              "2. Bob_Builder (Builder) - 32m\n"
-              "3. Charlie_Explorer (Guest) - 15m")
-    elif command == "listbans":
-      return ("[0]\tUsername: SpamUser123\tUserID: U-spam123\tMachineIds: a45f8d9e334c9b7a99d1\n"
-              "[1]\tUsername: TrollUser456\tUserID: U-troll456\tMachineIds: b67d23f456a789c123e4")
-    elif command == "friendRequests":
-      return "NewUser789\nAnotherUser321"
-    elif command.startswith("save"):
+    return self._handle_command(command)
+
+  def _handle_command(self, command: str) -> str:
+    """Handle command execution and return appropriate response."""
+    # Direct command mapping for exact matches
+    exact_commands = {
+      "status": self._handle_status_command,
+      "users": self._handle_users_command,
+      "listbans": self._handle_listbans_command,
+      "friendRequests": self._handle_friend_requests_command
+    }
+
+    if command in exact_commands:
+      return exact_commands[command]()
+
+    # Handle prefix-based commands
+    return self._handle_prefix_commands(command)
+
+  def _handle_status_command(self) -> str:
+    """Handle status command."""
+    return ("Server Status: Running\n"
+            "Uptime: 2h 30m\n"
+            "Active Users: 3\n"
+            "World: Crystal Caverns")
+
+  def _handle_users_command(self) -> str:
+    """Handle users command."""
+    return ("Connected Users:\n"
+            "1. Alice_VR (Admin) - 45m\n"
+            "2. Bob_Builder (Builder) - 32m\n"
+            "3. Charlie_Explorer (Guest) - 15m")
+
+  def _handle_listbans_command(self) -> str:
+    """Handle listbans command."""
+    return ("[0]\tUsername: SpamUser123\tUserID: U-spam123\tMachineIds: a45f8d9e334c9b7a99d1\n"
+            "[1]\tUsername: TrollUser456\tUserID: U-troll456\tMachineIds: b67d23f456a789c123e4")
+
+  def _handle_friend_requests_command(self) -> str:
+    """Handle friendRequests command."""
+    return "NewUser789\nAnotherUser321"
+
+  def _handle_prefix_commands(self, command: str) -> str:
+    """Handle commands that start with specific prefixes."""
+    if command.startswith("save"):
       return "World saved successfully"
     elif command.startswith("kick"):
       user = command.split(' ', 1)[1] if ' ' in command else 'unknown'
@@ -257,6 +284,17 @@ class StubDataSource(BaseDataSource):
       "headless_server": {
         "config_folder": "../../_stub_headless/"
       }
+    }
+
+  def update_manager_config_settings(self, settings_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Update manager configuration settings."""
+    # In a real implementation, this would save to a configuration file
+    # For the stub, we'll just simulate a successful update
+    logger.info("Updating manager config settings (stub mode): %s", settings_data)
+    return {
+        "message": "Manager configuration updated successfully (test mode)",
+        "updated_settings": settings_data,
+        "test_mode": True
     }
 
   def generate_config(self) -> Dict[str, Any]:
@@ -350,7 +388,7 @@ class StubDataSource(BaseDataSource):
   def get_server_status(self) -> Dict[str, Any]:
     """Generate server status matching test server format."""
     uptime = datetime.now() - self.start_time
-    uptime_str = str(uptime).split('.')[0]  # Remove microseconds
+    uptime_str = str(uptime).split('.', maxsplit=1)[0]  # Remove microseconds
 
     worlds_data = self.get_worlds_data()
     return {
@@ -392,7 +430,30 @@ class StubDataSource(BaseDataSource):
 
   def get_banned_users(self) -> List[Dict[str, Any]]:
     """Get banned users list matching test server format."""
-    return self.banned_users.copy()
+    # Parse the banned users using regex to handle spaces in usernames
+    formatted_bans = []
+
+    for ban_string in self.banned_users:
+      # Regex pattern to match: [anything] Username: value UserID: value MachineIds: value
+      pattern = r'\[.*?\]\s+Username:\s*(.+?)\s+UserID:\s*(.+?)\s+MachineIds:\s*(.+)$'
+      match = re.match(pattern, ban_string)
+
+      if match:
+        username = match.group(1).strip()
+        user_id = match.group(2).strip()
+        machine_ids = match.group(3).strip()
+
+        user_info = {
+          "username": username,
+          "userId": user_id,
+          "machineIds": machine_ids
+        }
+        formatted_bans.append(user_info)
+      else:
+        # Fallback for malformed strings - log and skip
+        logger.warning("Could not parse ban string: %s", ban_string)
+
+    return formatted_bans
 
   def get_friend_requests(self) -> List[str]:
     """Get friend requests list matching test server format."""

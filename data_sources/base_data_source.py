@@ -143,6 +143,19 @@ class BaseDataSource(ABC):
     ...
 
   @abstractmethod
+  def update_manager_config_settings(self, settings_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Update manager configuration settings.
+
+    Args:
+        settings_data: Configuration settings data to update
+
+    Returns:
+        Dict[str, Any]: Result of the update operation
+    """
+    ...
+
+  @abstractmethod
   def generate_config(self) -> Dict[str, Any]:
     """
     Generate configuration file.
