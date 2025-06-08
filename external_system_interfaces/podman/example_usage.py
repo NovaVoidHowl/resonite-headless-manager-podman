@@ -213,8 +213,12 @@ def main():
 
   except KeyboardInterrupt:
     print("\n\nExample interrupted by user")
-  except Exception as e:
-    logger.error("Error during example execution: %s", e)
+  except (OSError, IOError) as e:
+    logger.error("I/O error during example execution: %s", e)
+  except ImportError as e:
+    logger.error("Import error - missing dependencies: %s", e)
+  except Exception as e:  # pylint: disable=broad-exception-caught
+    logger.error("Unexpected error during example execution: %s", e)
   finally:
     # Clean up the client connection
     cleanup()

@@ -39,12 +39,11 @@ def _get_client() -> Optional[podman.PodmanClient]:
       Optional[podman.PodmanClient]: The Podman client or None if connection fails
   """
   global _client
-
   if _client is not None:
     try:
       _client.ping()
       return _client
-    except Exception:
+    except (podman_errors.APIError, OSError):
       _client = None
 
   connection_methods = [
@@ -61,7 +60,7 @@ def _get_client() -> Optional[podman.PodmanClient]:
       _client = client
       logger.info("Successfully connected using %s", method['desc'])
       return _client
-    except Exception as e:
+    except (podman_errors.APIError, OSError) as e:
       logger.warning("Connection failed with %s: %s", method['desc'], str(e))
 
   logger.error("All connection attempts failed")
@@ -128,7 +127,7 @@ def is_container_running(container_name: str) -> bool:
 
     container = client.containers.get(container_name)
     return container.status == 'running'
-  except Exception as e:
+  except (podman_errors.APIError, podman_errors.ContainerNotFound, OSError) as e:
     logger.error("Error checking container status: %s", str(e))
     return False
 
@@ -157,7 +156,7 @@ def get_container_status(container_name: str) -> Dict[str, Any]:
       'id': container.id,
       'image': inspect_data.get('ImageName', container.image)
     }
-  except Exception as e:
+  except (podman_errors.APIError, podman_errors.ContainerNotFound, OSError) as e:
     logger.error("Error getting container status: %s", str(e))
     return {'error': str(e), 'status': 'unknown'}
 
@@ -192,7 +191,7 @@ def start_container(container_name: str) -> bool:
     logger.warning("Container start took longer than expected")
     return False
 
-  except Exception as e:
+  except (podman_errors.APIError, podman_errors.ContainerNotFound, OSError) as e:
     logger.error("Failed to start container '%s': %s", container_name, str(e))
     return False
 
@@ -227,7 +226,7 @@ def stop_container(container_name: str) -> bool:
     logger.warning("Container stop took longer than expected")
     return False
 
-  except Exception as e:
+  except (podman_errors.APIError, podman_errors.ContainerNotFound, OSError) as e:
     logger.error("Failed to stop container '%s': %s", container_name, str(e))
     return False
 
@@ -263,7 +262,7 @@ def restart_container(container_name: str) -> bool:
     logger.warning("Container restart took longer than expected")
     return False
 
-  except Exception as e:
+  except (podman_errors.APIError, podman_errors.ContainerNotFound, OSError) as e:
     logger.error("Failed to restart container '%s': %s", container_name, str(e))
     return False
 
@@ -346,7 +345,7 @@ def execute_command(container_name: str, command: str, timeout: int = 10) -> str
         except OSError as e:
           logger.warning("Error cleaning up file %s: %s", path, str(e))
 
-  except Exception as e:
+  except (OSError, podman_errors.APIError, podman_errors.ContainerNotFound) as e:
     error_msg = str(e).strip() or "Unknown error"
     logger.error("Error executing command in container '%s': %s", container_name, error_msg)
     return f"Error: {error_msg}"
@@ -383,7 +382,7 @@ def get_container_logs(container_name: str, tail: int = 100) -> str:
     else:
       return logs.decode('utf-8') if isinstance(logs, bytes) else str(logs)
 
-  except Exception as e:
+  except (podman_errors.APIError, podman_errors.ContainerNotFound, OSError) as e:
     logger.error("Error getting logs for container '%s': %s", container_name, str(e))
     return f"Error getting logs: {str(e)}"
 
@@ -411,7 +410,7 @@ def list_containers() -> List[Dict[str, Any]]:
       for container in containers
     ]
 
-  except Exception as e:
+  except (podman_errors.APIError, podman_errors.ContainerNotFound, OSError) as e:
     logger.error("Error listing containers: %s", str(e))
     return []
 
@@ -436,7 +435,7 @@ def container_exists(container_name: str) -> bool:
 
   except podman_errors.ContainerNotFound:
     return False
-  except Exception as e:
+  except (podman_errors.APIError, OSError) as e:
     logger.error("Error checking if container '%s' exists: %s", container_name, str(e))
     return False
 
@@ -447,7 +446,7 @@ def cleanup():
   if _client:
     try:
       _client.close()
-    except Exception as e:
+    except (podman_errors.APIError, OSError, AttributeError) as e:
       logger.warning("Error closing Podman client: %s", str(e))
     finally:
       _client = None
