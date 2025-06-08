@@ -321,13 +321,13 @@
             .container {
                 padding: 1rem;
             }
-            
+
             .endpoint-header {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 0.5rem;
             }
-            
+
             .endpoint-path {
                 font-size: 1rem;
             }
@@ -365,7 +365,7 @@
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Send commands to the headless server and receive structured responses.</p>
-                    
+
                     <h4>Message Format</h4>
                     <div class="code-block">{
   "type": "command",
@@ -404,7 +404,7 @@
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Real-time updates about world status, users, and properties.</p>
-                    
+
                     <h4>Request Message</h4>
                     <div class="code-block">{
                       "type": "get_worlds"
@@ -454,7 +454,7 @@
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Real-time streaming of container logs. Automatically sends recent logs on connection and streams new logs.</p>
-                    
+
                     <div class="websocket-info">
                         <h5>Auto-streaming</h5>
                         <p>This endpoint automatically streams log updates. No request message needed.</p>
@@ -477,7 +477,7 @@
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Real-time CPU usage monitoring with updates every second.</p>
-                    
+
                     <div class="websocket-info">
                         <h5>Auto-streaming</h5>
                         <p>This endpoint automatically streams CPU usage updates every second.</p>
@@ -499,7 +499,7 @@
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Real-time memory usage monitoring with updates every second.</p>
-                    
+
                     <div class="websocket-info">
                         <h5>Auto-streaming</h5>
                         <p>This endpoint automatically streams memory usage updates every second.</p>
@@ -523,7 +523,7 @@
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Get container status information on demand.</p>
-                    
+
                     <h4>Request Message</h4>
                     <div class="code-block">{
   "type": "get_container_status"
@@ -550,7 +550,7 @@
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Heartbeat connection to keep other WebSocket connections alive.</p>
-                    
+
                     <div class="websocket-info">
                         <h5>Connection maintenance</h5>
                         <p>This endpoint is used internally to maintain connection state.</p>
@@ -566,7 +566,7 @@
                 <div class="endpoint-details">
                     <h4>Description</h4>
                     <p>Monitor server status and receive real-time updates.</p>
-                    
+
                     <h4>Request Message</h4>
                     <div class="code-block">{
   "type": "get_status"
@@ -606,9 +606,9 @@
                 </div>
                 <textarea id="request-body" rows="6" placeholder="Enter JSON request body..."></textarea>
             </div>
-            
+
             <button class="btn" onclick="makeRequest()">Send Request</button>
-            
+
             <div class="response-output" id="response-output">Response will appear here...</div>
         </div>
 
@@ -616,7 +616,7 @@
         <div class="try-it-section">
             <h3>WebSocket Testing</h3>
             <p>Test WebSocket connections and send messages.</p>
-            
+
             <div class="form-group">
                 <label for="ws-endpoint">WebSocket Endpoint:</label>
                 <select id="ws-endpoint">
@@ -629,16 +629,16 @@
                     <option value="/ws/status">Status</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
                 <label for="ws-message">Message (JSON):</label>
                 <textarea id="ws-message" rows="4" placeholder='{"type": "command", "command": "status"}'></textarea>
             </div>
-            
+
             <button class="btn" onclick="connectWebSocket()" id="ws-connect-btn">Connect</button>
             <button class="btn" onclick="sendWebSocketMessage()" id="ws-send-btn" disabled>Send Message</button>
             <button class="btn" onclick="disconnectWebSocket()" id="ws-disconnect-btn" disabled>Disconnect</button>
-            
+
             <div class="response-output" id="ws-output">WebSocket messages will appear here...</div>
         </div>
     </div>    <script>
@@ -650,16 +650,16 @@
             try {
                 const response = await fetch('/openapi.json');
                 openApiSchema = await response.json();
-                
+
                 const restEndpointsContainer = document.getElementById('rest-endpoints');
                 const loadingIndicator = restEndpointsContainer.querySelector('.loading-indicator');
-                
+
                 // Remove loading indicator
                 loadingIndicator.remove();
-                
+
                 // Group endpoints by tags
                 const endpointsByTag = {};
-                
+
                 Object.entries(openApiSchema.paths).forEach(([path, methods]) => {
                     Object.entries(methods).forEach(([method, spec]) => {
                         if (spec.tags && spec.tags.length > 0) {
@@ -675,39 +675,39 @@
                         }
                     });
                 });
-                
+
                 // Render endpoint groups
                 Object.entries(endpointsByTag).forEach(([tag, endpoints]) => {
                     const groupDiv = document.createElement('div');
                     groupDiv.className = 'endpoint-group';
-                    
+
                     groupDiv.innerHTML = `
                         <div class="group-header">
                             <h3>${tag}</h3>
                             <p>${getTagDescription(tag)}</p>
                         </div>
                     `;
-                    
+
                     endpoints.forEach(endpoint => {
                         const endpointDiv = document.createElement('div');
                         endpointDiv.className = 'endpoint';
                         endpointDiv.innerHTML = createEndpointHtml(endpoint);
                         groupDiv.appendChild(endpointDiv);
                     });
-                    
+
                     restEndpointsContainer.appendChild(groupDiv);
                 });
-                
+
                 // Populate the try-it-out dropdown
                 populateEndpointSelector(endpointsByTag);
-                
+
             } catch (error) {
                 console.error('Failed to load OpenAPI schema:', error);
                 const restEndpointsContainer = document.getElementById('rest-endpoints');
                 const loadingIndicator = restEndpointsContainer.querySelector('.loading-indicator');
                 loadingIndicator.innerHTML = `
                     <p style="color: #dc3545;">
-                        Failed to load REST endpoints from OpenAPI schema. 
+                        Failed to load REST endpoints from OpenAPI schema.
                         Error: ${error.message}
                     </p>
                 `;
@@ -726,7 +726,7 @@
         function createEndpointHtml(endpoint) {
             const { path, method, spec } = endpoint;
             const methodClass = method.toLowerCase();
-            
+
             let responsesHtml = '';
             if (spec.responses) {
                 responsesHtml = '<div class="responses">';
@@ -748,7 +748,7 @@
                     <div class="code-block">${getRequestBodyExample(spec.requestBody)}</div>
                 `;
             }
-            
+
             return `
                 <button type="button" class="endpoint-header" onclick="toggleEndpoint(this.parentElement)" onkeydown="if(event.key==='Enter'||event.key===' '){toggleEndpoint(this.parentElement);}">
                     <span class="method ${methodClass}">${method}</span>
@@ -806,12 +806,12 @@
 
         function populateEndpointSelector(endpointsByTag) {
             const select = document.getElementById('endpoint-select');
-            
+
             // Clear existing options except the first one
             while (select.children.length > 1) {
                 select.removeChild(select.lastChild);
             }
-            
+
             Object.entries(endpointsByTag).forEach(([tag, endpoints]) => {
                 endpoints.forEach(endpoint => {
                     const option = document.createElement('option');
@@ -832,13 +832,13 @@
             const requestBodyGroup = document.getElementById('request-body-group');
             const requestBody = document.getElementById('request-body');
             const refreshConfigBtn = document.getElementById('refresh-config-btn');
-            
+
             if (select.value.startsWith('POST:')) {
                 requestBodyGroup.style.display = 'block';
-                
+
                 // Get the path from the selected value
                 const [method, path] = select.value.split(':');
-                
+
                 // Special handling for POST /api/headless/config - fetch current config
                 if (path === '/api/headless/config') {
                     refreshConfigBtn.style.display = 'inline-block';
@@ -872,10 +872,10 @@
             try {
                 // Show loading message
                 requestBodyElement.value = 'Loading current config...';
-                
+
                 // Fetch current config from GET endpoint
                 const response = await fetch(window.location.origin + '/api/headless/config');
-                
+
                 if (response.ok) {
                     const currentConfig = await response.text();
                     const formattedConfig = formatJsonResponse(currentConfig);
@@ -926,17 +926,17 @@
             const select = document.getElementById('endpoint-select');
             const requestBody = document.getElementById('request-body');
             const output = document.getElementById('response-output');
-            
+
             if (!select.value) {
                 output.textContent = 'Please select an endpoint';
                 return;
             }
-            
+
             const [method, path] = select.value.split(':');
             const url = window.location.origin + path;
-            
+
             output.textContent = 'Sending request...';
-            
+
             try {
                 const options = {
                     method: method,
@@ -944,15 +944,15 @@
                         'Content-Type': 'application/json',
                     },
                 };
-                
+
                 if (method === 'POST' && requestBody.value.trim()) {
                     options.body = requestBody.value;
                 }
-                
+
                 const response = await fetch(url, options);
                 const data = await response.text();
                 const formattedData = formatJsonResponse(data);
-                
+
                 output.textContent = `Status: ${response.status}\n\n${formattedData}`;
             } catch (error) {
                 output.textContent = `Error: ${error.message}`;
@@ -965,17 +965,17 @@
             const connectBtn = document.getElementById('ws-connect-btn');
             const sendBtn = document.getElementById('ws-send-btn');
             const disconnectBtn = document.getElementById('ws-disconnect-btn');
-            
+
             if (currentWebSocket) {
                 output.textContent += '\nDisconnecting existing connection...\n';
                 currentWebSocket.close();
             }
-            
+
             const wsUrl = `ws://${window.location.host}${endpointSelect.value}`;
             output.textContent = `Connecting to ${wsUrl}...\n`;
-            
+
             currentWebSocket = new WebSocket(wsUrl);
-            
+
             currentWebSocket.onopen = function(event) {
                 output.textContent += 'Connected!\n';
                 connectBtn.disabled = true;
@@ -988,7 +988,7 @@
                 output.textContent += `[${timestamp}] Received:\n${formattedData}\n\n`;
                 output.scrollTop = output.scrollHeight;
             };
-            
+
             currentWebSocket.onclose = function(event) {
                 output.textContent += 'Connection closed\n';
                 connectBtn.disabled = false;
@@ -996,7 +996,7 @@
                 disconnectBtn.disabled = true;
                 currentWebSocket = null;
             };
-            
+
             currentWebSocket.onerror = function(error) {
                 output.textContent += `Error: ${error}\n`;
             };
@@ -1005,12 +1005,12 @@
         function sendWebSocketMessage() {
             const messageInput = document.getElementById('ws-message');
             const output = document.getElementById('ws-output');
-            
+
             if (!currentWebSocket || currentWebSocket.readyState !== WebSocket.OPEN) {
                 output.textContent += 'WebSocket not connected\n';
                 return;
             }
-            
+
             if (!messageInput.value.trim()) {
                 output.textContent += 'Please enter a message\n';
                 return;
@@ -1043,7 +1043,7 @@
                         }
                     });
                 });
-                
+
                 // Configure observer to watch for text changes and child nodes
                 observer.observe(output, {
                     childList: true,
