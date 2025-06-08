@@ -38,7 +38,7 @@ if [ $? -ne 0 ]; then
     echo "❌ Missing required packages (fastapi, uvicorn)"
     echo "Installing required packages..."
     $PYTHON_CMD -m pip install fastapi uvicorn python-multipart
-    
+
     if [ $? -ne 0 ]; then
         echo "❌ Failed to install required packages"
         echo "Please install manually: pip install fastapi uvicorn python-multipart"
