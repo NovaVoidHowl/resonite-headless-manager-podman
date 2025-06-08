@@ -1,23 +1,23 @@
 {
   "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
-  "loginCredential": "Headless-Bot",
   "LoginPassword": "IamAHeadlessBot'sAccountPassword",
+  "loginCredential": "Headless-Bot",
   "startWorlds": [
     {
-      "isEnabled": true,
-      "sessionName": "Debug - do not join",
+      "accessLevel": "RegisteredUsers",
+      "defaultUserRoles": {
+        "ABuilder": "Builder",
+        "AnAdmin": "Admin"
+      },
       "description": "Instance to test out headless management interface",
+      "isEnabled": true,
+      "loadWorldPresetName": "Grid",
+      "maxUsers": "6",
+      "sessionName": "Debug - do not join",
       "tags": [
         "debug",
         "test"
-      ],
-      "defaultUserRoles": {
-        "AnAdmin": "Admin",
-        "ABuilder": "Builder"
-      },
-      "accessLevel": "RegisteredUsers",
-      "maxUsers": "6",
-      "loadWorldPresetName": "Grid"
+      ]
     }
   ]
 }
