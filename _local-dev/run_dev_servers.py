@@ -28,6 +28,7 @@ import threading
 import subprocess
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 
 class ColoredOutput:
@@ -64,7 +65,7 @@ class ServerRunner:
 
   def setup_signal_handlers(self):
     """Setup signal handlers for graceful shutdown."""
-    def signal_handler(signum, frame):
+    def signal_handler(_signum, _frame):
       print(f"\n{ColoredOutput.colorize('🛑 Shutdown signal received...', 'yellow')}")
       self.stop_all_servers()
       sys.exit(0)
@@ -82,7 +83,7 @@ class ServerRunner:
     with self.lock:
       print(f"{colored_prefix} {line.strip()}")
 
-  def run_server_with_logging(self, command: list, process_name: str, color: str, cwd: str = None):
+  def run_server_with_logging(self, command: list, process_name: str, color: str, cwd: Optional[str] = None):
     """Run a server process and handle its output logging."""
     try:
       # Set environment to use UTF-8 encoding for Windows
@@ -107,6 +108,7 @@ class ServerRunner:
 
       # Read output line by line
       while self.running and process.poll() is None:
+        assert process.stdout is not None  # stdout is guaranteed to be a pipe due to stdout=subprocess.PIPE
         line = process.stdout.readline()
         if line:
           self.log_with_prefix(process_name, line, color)
@@ -119,7 +121,7 @@ class ServerRunner:
         else:
           self.log_with_prefix(process_name, f"Server stopped with exit code: {return_code}", 'red')
 
-    except Exception as e:
+    except (subprocess.SubprocessError, OSError) as e:
       self.log_with_prefix(process_name, f"Error running server: {e}", 'red')
 
   def start_api_server(self):
@@ -154,14 +156,13 @@ class ServerRunner:
 
     for process in self.processes:
       try:
-        if process.poll() is None:  # Process is still running
-          process.terminate()
+        if process.poll() is None:  # Process is still running          process.terminate()
           # Give it a moment to terminate gracefully
           try:
             process.wait(timeout=5)
           except subprocess.TimeoutExpired:
             process.kill()
-      except Exception as e:
+      except (subprocess.SubprocessError, OSError, AttributeError) as e:
         print(f"Error stopping process: {e}")
 
   def print_startup_banner(self):
