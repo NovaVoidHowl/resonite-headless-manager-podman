@@ -24,7 +24,6 @@ import os
 import sys
 import logging
 import uvicorn
-import pathlib
 
 # Add parent directories to path to import our modules
 current_dir = os.path.dirname(__file__)
@@ -35,8 +34,8 @@ sys.path.insert(0, api_dir)
 sys.path.insert(0, root_dir)
 
 # Now import our modules after path setup
-from data_sources.factory import DataSourceFactory
-from api_manager import APIManager
+from api_manager import APIManager  # noqa: E402 # pylint: disable=wrong-import-position,import-error
+from data_sources.factory import DataSourceFactory  # noqa: E402 # pylint: disable=wrong-import-position
 
 
 # Configure logging
