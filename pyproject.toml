@@ -4,6 +4,10 @@ indent_size = 2
 aggressive = 1
 ignore = ["E121", "E111", "E114", "W504"]
 
+[tool.flake8]
+max-line-length = 120
+ignore = ["E121", "E111", "E114", "W504"]
+
 [tool.pylint.format]
 max-line-length = 120
 indent-string = "  "
