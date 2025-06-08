@@ -1,4 +1,14 @@
 {
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.autopep8",
+    "editor.detectIndentation": false,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  },
+  "autopep8.args": [
+    "--indent-size=2",
+    "--max-line-length=120"
+  ],
   "cSpell.words": [
     "acceptfriendrequest",
     "accesslevel",
@@ -54,16 +64,10 @@
     "venv",
     "Zetaphor"
   ],
+  "editor.insertSpaces": true,
   "editor.rulers": [
     120
   ],
-  "python.analysis.typeCheckingMode": "basic",
   "editor.tabSize": 2,
-  "editor.insertSpaces": true,  "[python]": {
-    "editor.tabSize": 2,
-    "editor.insertSpaces": true,
-    "editor.detectIndentation": false,
-    "editor.defaultFormatter": "ms-python.autopep8"
-  },
-  "autopep8.args": ["--indent-size=2", "--max-line-length=120"]
+  "python.analysis.typeCheckingMode": "basic"
 }
