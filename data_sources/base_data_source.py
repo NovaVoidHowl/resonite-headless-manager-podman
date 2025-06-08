@@ -76,17 +76,25 @@ class BaseDataSource(ABC):
 
   # Command Operations
   @abstractmethod
-  def send_command(self, command: str, timeout: int = 10, use_cache: bool = True) -> str:
+  def get_structured_command_response(self, command: str, target_world_instance: str,
+                                      command_mode: str, timeout: int = 10) -> Dict[str, Any]:
     """
-    Send a command to the container/server.
+    Get a structured response for a command with appropriate formatting and type.
+
+    This method handles special commands that need structured responses (like listbans, users, etc.)
+    and returns a dictionary containing the response type and data. For regular commands,
+    it can return the raw output.
 
     Args:
         command: The command to execute
         timeout: Command timeout in seconds
-        use_cache: Whether to use cached results if available
 
     Returns:
-        str: Command output or error message
+        Dict[str, Any]: Structured response containing:
+            - type: The response type (e.g., 'bans_update', 'command_response', etc.)
+            - output/data: The structured data or raw output
+            - command: The original command (for command_response type)
+            - other fields as appropriate for the response type
     """
     ...
 
@@ -184,6 +192,67 @@ class BaseDataSource(ABC):
             - percent: Memory usage percentage
             - used: Used memory (e.g. "2.1GB")
             - total: Total memory (e.g. "8.0GB")
+    """
+    ...
+
+  # Data Access Operations
+  @abstractmethod
+  def get_worlds_data(self) -> List[Dict[str, Any]]:
+    """
+    Get worlds data.
+
+    Returns:
+        List[Dict[str, Any]]: List of world information dictionaries
+    """
+    ...
+
+  @abstractmethod
+  def get_users_data(self) -> List[Dict[str, Any]]:
+    """
+    Get users data.
+
+    Returns:
+        List[Dict[str, Any]]: List of user information dictionaries
+    """
+    ...
+
+  @abstractmethod
+  def get_server_status(self) -> Dict[str, Any]:
+    """
+    Get server status information.
+
+    Returns:
+        Dict[str, Any]: Server status information dictionary
+    """
+    ...
+
+  @abstractmethod
+  def get_headless_config(self) -> Dict[str, Any]:
+    """
+    Get headless configuration.
+
+    Returns:
+        Dict[str, Any]: Headless configuration dictionary
+    """
+    ...
+
+  @abstractmethod
+  def get_banned_users(self) -> List[Dict[str, Any]]:
+    """
+    Get banned users list.
+
+    Returns:
+        List[Dict[str, Any]]: List of banned user information dictionaries
+    """
+    ...
+
+  @abstractmethod
+  def get_friend_requests(self) -> List[str]:
+    """
+    Get friend requests list.
+
+    Returns:
+        List[str]: List of friend request usernames
     """
     ...
 

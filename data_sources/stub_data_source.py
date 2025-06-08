@@ -14,7 +14,8 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Callable, Optional
 
-from .base_data_source import BaseDataSource
+from data_sources.base_data_source import BaseDataSource  # noqa: E402
+# pylint: disable=wrong-import-position,import-error
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +58,104 @@ class StubDataSource(BaseDataSource):
     self.banned_users = [
         "[0]   Username: SpamUser123   UserID: U-spam123   MachineIds: 668flj393ao9sh8wj9my",
         "[BBdEEDS]   Username: Spam User 123   UserID: U-spam123   MachineIds: 668flj393ao9sh8wj9my",
-        "[1]   Username: TrollUser456  UserID: U-troll456  MachineIds: b67d23f456a789c123e4"
+        "[1]   Username: TrollUser456  UserID: U-troll456  MachineIds: b67d23f456a789c123e4",
+        "[2]   Username: HackerUser789  UserID: U-hacker789  MachineIds: c89d45f678b012d345f6"
     ]
     self.friend_requests = ["NewUser789", "AnotherUser321"]
+
+    # info on global commands
+    self.native_headless_global_commands = [
+      {"saveConfig": "Saves the current settings into the original config file"},
+      {"login": "Login to an account - requires username and password"},
+      {"logout": "Logout from the current account"},
+      {"message": "Message user in friends list - requires username and message"},
+      {"friendRequests": "Get list of friend requests"},
+      {"acceptFriendRequest": "Accept a friend request - requires username"},
+      {"worlds": "Lists all active worlds"},
+      {"focus": "Focus on a specific world - requires world world name or number"},
+      {"startWorldURL": "Start a world by URL - requires world URL"},
+      {"startWorldTemplate": "Start a world by template - requires template name"},
+      {"ban": "Bans the user from all sessions hosted by server - requires username"},
+      {"unban": "Unbans the user from all sessions hosted by server - requires username"},
+      {"listbans": "Lists all active bans"},
+      {"banByName": "Bans the user by name from all sessions hosted by server - requires username"},
+      {"unbanByName": "Unbans the user by name from all sessions hosted by server - requires username"},
+      {"banByID": "Bans the user by ID from all sessions hosted by server - requires user ID"},
+      {"unbanByID": "Unbans the user by ID from all sessions hosted by server - requires user ID"},
+      {"gc": "Forces full garbage collection"},
+      {"debugWorldState": "Prints out diagnostic information for all worlds which can be used for debugging purposes"},
+      {"shutdown": "Shuts down the headless client - note if in container this will NOT stop the container"},
+      {"tickRate": "Sets the maximum simulation rate for the servers - requires rate in seconds"},
+      {"log": (
+        "Switches the interactive shell to logging output. Press enter again to restore interactive shell. "
+        "- Should not be used, reject command"
+      )},
+    ]
+    self.native_headless_world_specific_commands = [
+      {"invite": "Invite user to a world - requires username (must be in friends list)"},
+      {"status": "Get status of the current world"},
+      {"sessionUrl": "Get session URL of the current world"},
+      {"sessionID": "Get session ID of the current world"},
+      {"copySessionURL": "Copy session URL to clipboard - NOT SUPPORTED"},
+      {"copySessionID": "Copy session ID to clipboard - NOT SUPPORTED"},
+      {"users": "Get list of users in the current world"},
+      {"close": "Close the current world"},
+      {"save": "Save the current world"},
+      {"restart": "Restart the current world"},
+      {"kick": "Kick a user from the current world - requires username"},
+      {"silence": "Silence a user in the current world - requires username"},
+      {"unsilence": "Unsilence a user in the current world - requires username"},
+      {"respawn": "Respawn a user in the current world - requires username"},
+      {"name": "Change the name of the current world - requires new name"},
+      {"accessLevel": "Change the access level of the current world - requires new access level"},
+      {"hideFromListing": "Hide the current world from public listing - requires boolean value"},
+      {"description": "Change the description of the current world - requires new description"},
+      {
+        "maxUsers": (
+          "Change the maximum number of users in the current world - "
+          "requires new max users"
+        )
+      },
+      {"awayKickInterval": "Sets the away kick interval for the current world - requires minutes"},
+      {"import": "Import an asset into the focused world - requires asset URL or path"},
+      {
+        "importMinecraft": (
+          "Import a Minecraft world. Requires Mineways to be installed. - folder containing Minecraft "
+          "world with the level.dat file - NOT SUPPORTED"
+        )
+      },
+      {"dynamicImpulse": "Sends a dynamic impulse with given tag to the scene root - requires tag"},
+      {
+        "dynamicImpulseString": (
+          "Sends a dynamic impulse with given tag and string value to the scene root - "
+          "requires tag and string value"
+        )
+      },
+      {
+        "dynamicImpulseInt": (
+          "Sends a dynamic impulse with given tag and integer value to the scene root - "
+          "requires tag and integer value"
+        )
+      },
+      {
+        "dynamicImpulseFloat": (
+          "Sends a dynamic impulse with given tag and float value to the scene root - "
+          "requires tag and float value"
+        )
+      },
+      {
+        "spawn": (
+          "Spawns an item from a record URL into the world's root - "
+          "requires url, state (bool), persistence (bool)"
+        )
+      },
+    ]
+
+    self.custom_global_commands = [
+      {"server_status": "global info command - custom command merging worlds and server status"}
+    ]
+    self.custom_world_specific_commands = [
+    ]
 
     # Initialize with some sample log entries
     self._generate_initial_logs()
@@ -165,73 +261,145 @@ class StubDataSource(BaseDataSource):
       }
 
   # Command Operations
-  def send_command(self, command: str, _timeout: int = 10, _use_cache: bool = True) -> str:
-    """Send a command to the container with responses matching test server format."""
+  def _is_valid_command(self, command: str) -> tuple[bool, str, str]:
+    """
+    Check if a command is valid and return command type information.
+
+    Args:
+        command: The full command string (e.g., "focus 0" or "ban user123")
+
+    Returns:
+        Tuple of (is_valid, command_type, base_command)
+        - is_valid: Whether the command is recognized
+        - command_type: "global" or "world_specific"
+        - base_command: The base command without parameters
+    """
+    # Extract the base command (first word)
+    base_command = command.split()[0] if command.strip() else ""
+
+    # Check global commands
+    for cmd_dict in self.native_headless_global_commands:
+      if base_command in cmd_dict:
+        return True, "global", base_command
+
+    # Check world-specific commands
+    for cmd_dict in self.native_headless_world_specific_commands:
+      if base_command in cmd_dict:
+        return True, "world_specific", base_command
+
+    # Check custom global commands
+    for cmd_dict in self.custom_global_commands:
+      if base_command in cmd_dict:
+        return True, "custom_global", base_command
+
+    # Check custom world-specific commands
+    for cmd_dict in self.custom_world_specific_commands:
+      if base_command in cmd_dict:
+        return True, "custom_world_specific", base_command
+
+    return False, "unknown", base_command
+
+  def get_structured_command_response(self, command: str, target_world_instance: str,
+                                      command_mode: str, _timeout: int = 10) -> Dict[str, Any]:
+    """Get a structured response for a command with appropriate formatting and type."""
+    # Check the container status before executing commands, no point in executing if not running
     if not self._container_running:
-      return "Error: Container is not running"
+      return {
+        "type": "error",
+        "message": "Container is not running"
+      }
 
-    logger.info("Executing command (simulated): %s", command)
+    # split command flow based on command mode
+    if command_mode == "direct":
+      # Direct command execution, no prefix handling
+      logger.info("Executing direct command: %s", command)
+      # Simulate command processing delay
+      time.sleep(random.uniform(0.1, 0.5))
 
-    # Simulate command processing delay
-    time.sleep(random.uniform(0.1, 0.5))
+      # direct commands do not have structured responses, just return the output
+      # this is more intended for use on the console,
+      # We return a base64 encoded blob of the output (to guard against odd characters)
 
-    # Generate realistic responses based on command matching test server
-    return self._handle_command(command)
+      # for this stub we create a random string of 20 characters then base64 encode it
+      output = ''.join(random.choices('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=20))
+      output = output.encode('utf-8').hex()  # Simulate base64 encoding
+      # Return structured response for direct command
+      logger.info("Direct command output: %s", output)
 
-  def _handle_command(self, command: str) -> str:
-    """Handle command execution and return appropriate response."""
-    # Direct command mapping for exact matches
-    exact_commands = {
-      "status": self._handle_status_command,
-      "users": self._handle_users_command,
-      "listbans": self._handle_listbans_command,
-      "friendRequests": self._handle_friend_requests_command
-    }
+      return {
+        "type": "command_response",
+        "command": command,
+        "output": output,
+        "timestamp": datetime.now().isoformat()
+      }
+    elif command_mode == "default":
+      # Default command execution with structured response
+      logger.info("Executing structured command (simulated): %s", command)
 
-    if command in exact_commands:
-      return exact_commands[command]()
+      # Simulate command processing delay
+      time.sleep(random.uniform(0.1, 0.5))
 
-    # Handle prefix-based commands
-    return self._handle_prefix_commands(command)
+      # Use current timestamp for all responses
+      current_timestamp = datetime.now().isoformat()
 
-  def _handle_status_command(self) -> str:
-    """Handle status command."""
-    return ("Server Status: Running\n"
-            "Uptime: 2h 30m\n"
-            "Active Users: 3\n"
-            "World: Crystal Caverns")
+      # Check if provided command is valid
+      is_valid, command_type, base_command = self._is_valid_command(command)
+      if not is_valid:
+        return {
+          "type": "error",
+          "command": command,
+          "message": f"Unknown command: {base_command}",
+          "timestamp": current_timestamp
+        }
 
-  def _handle_users_command(self) -> str:
-    """Handle users command."""
-    return ("Connected Users:\n"
-            "1. Alice_VR (Admin) - 45m\n"
-            "2. Bob_Builder (Builder) - 32m\n"
-            "3. Charlie_Explorer (Guest) - 15m")
+      # Log the command type for debugging
+      logger.info("Command '%s' recognized as %s command", base_command, command_type)
 
-  def _handle_listbans_command(self) -> str:
-    """Handle listbans command."""
-    return ("[0]\tUsername: SpamUser123\tUserID: U-spam123\tMachineIds: a45f8d9e334c9b7a99d1\n"
-            "[1]\tUsername: TrollUser456\tUserID: U-troll456\tMachineIds: b67d23f456a789c123e4")
-
-  def _handle_friend_requests_command(self) -> str:
-    """Handle friendRequests command."""
-    return "NewUser789\nAnotherUser321"
-
-  def _handle_prefix_commands(self, command: str) -> str:
-    """Handle commands that start with specific prefixes."""
-    if command.startswith("save"):
-      return "World saved successfully"
-    elif command.startswith("kick"):
-      user = command.split(' ', 1)[1] if ' ' in command else 'unknown'
-      return f"User kicked successfully: {user}"
-    elif command.startswith("ban"):
-      user = command.split(' ', 1)[1] if ' ' in command else 'unknown'
-      return f"User banned successfully: {user}"
-    elif command.startswith("unban"):
-      user = command.split(' ', 1)[1] if ' ' in command else 'unknown'
-      return f"User unbanned successfully: {user}"
+      # Handle special commands that need structured responses
+      if command == "listbans":  # global info command
+        return {
+          "type": "bans_update",
+          "bans": self.get_banned_users(),
+          "timestamp": current_timestamp
+        }
+      elif command == "friendRequests":  # global info command
+        return {
+          "type": "command_response",
+          "command": command,
+          "output": self.get_friend_requests(),
+          "timestamp": current_timestamp
+        }
+      elif command == "users":  # specific to a world
+        return {
+          "type": "command_response",
+          "command": command,
+          "world": target_world_instance,
+          "output": self.get_users_data(),
+          "timestamp": current_timestamp
+        }
+      elif command == "server_status":  # global info command (custom command merging worlds and server status)
+        return {
+          "type": "command_response",
+          "command": command,
+          "output": self.get_server_status(),
+          "timestamp": current_timestamp
+        }
+      else:
+        # commands that have not been implemented yet
+        logger.warning("Command '%s' is currently not supported", base_command)
+        return {
+          "type": "command_response",
+          "command": command,
+          "output": "Currently not supported - no interface defined for this command",
+          "timestamp": current_timestamp
+        }
     else:
-      return f"Unexpected Command: {command}"
+      # Handle unknown command modes - should not happen as there is a check in the API manager
+      return {
+        "type": "error",
+        "message": f"Unknown command mode: {command_mode}",
+        "timestamp": datetime.now().isoformat()
+      }
 
   # Log Operations
   def get_container_logs(self) -> str:
