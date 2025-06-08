@@ -72,6 +72,7 @@ class ServerRunner:
     signal.signal(signal.SIGINT, signal_handler)
     if hasattr(signal, 'SIGTERM'):
       signal.signal(signal.SIGTERM, signal_handler)
+
   def log_with_prefix(self, process_name: str, line: str, color: str = 'white'):
     """Log a line with server prefix and timestamp."""
     timestamp = datetime.now().strftime("%H:%M:%S")
@@ -171,7 +172,7 @@ class ServerRunner:
 {ColoredOutput.colorize('=' * 80, 'bold')}
 
 Starting development environment with:
-  {ColoredOutput.colorize('🔧 API Test Server', 'cyan')}   → http://localhost:8000 (API docs: /docs)
+  {ColoredOutput.colorize('🔧 API Test Server', 'cyan')}   → http://localhost:8000
   {ColoredOutput.colorize('🌐 Web UI Server', 'green')}    → http://localhost:8080
 
 {ColoredOutput.colorize('📋 Features:', 'yellow')}
