@@ -1,9 +1,0 @@
-[FORMAT]
-max-line-length=120
-indent-string="  "
-
-[MESSAGES CONTROL]
-disable=C0103,C0325,W0603
-
-[MASTER]
-extension-pkg-allow-list=_curses

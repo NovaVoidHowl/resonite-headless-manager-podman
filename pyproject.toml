@@ -3,3 +3,18 @@ max_line_length = 120
 indent_size = 2
 aggressive = 1
 ignore = ["E121", "E111", "E114", "W504"]
+
+[tool.pylint.format]
+max-line-length = 120
+indent-string = "  "
+
+[tool.pylint.messages_control]
+disable = [
+    "C0103",  # invalid-name
+    "C0325",  # superfluous-parens
+    "W0603",  # global-statement
+]
+
+[tool.pylint.master]
+extension-pkg-allow-list = ["_curses"]
+init-hook = 'import sys; sys.path.append(".")'
