@@ -158,7 +158,6 @@ class QueueItem:
 
 class QueueResult:
   """Result object returned when adding items to the queue."""
-
   def __init__(self, queue_id: str, position: int, queue_item: QueueItem):
     self.queue_id = queue_id
     self.position = position
@@ -182,11 +181,19 @@ class QueueResult:
 
       result = await loop.run_in_executor(None, get_result)
       return result
-    except Exception as e:
+    except (RuntimeError, ValueError, TimeoutError, AttributeError) as e:
       logger.error("Error waiting for command completion: %s", str(e))
       return ExecutionResult(
           success=False,
           error=f"Error waiting for completion: {str(e)}",
+          command_executed=str(self._queue_item.command or self._queue_item.command_block)
+      )
+    except Exception as e:  # pylint: disable=broad-exception-caught
+      # Catch any other unexpected exceptions to ensure we return a result
+      logger.error("Unexpected error waiting for command completion: %s", str(e))
+      return ExecutionResult(
+          success=False,
+          error=f"Unexpected error waiting for completion: {str(e)}",
           command_executed=str(self._queue_item.command or self._queue_item.command_block)
       )
 
@@ -445,13 +452,14 @@ class CommandQueue:
     self._shutdown_requested = True
 
     # Clear remaining queue
-    self.clear_queue()
-
-    # Shutdown executor
+    self.clear_queue()    # Shutdown executor
     try:
       self._executor.shutdown(wait=True)
-    except Exception as e:
+    except (RuntimeError, OSError, AttributeError) as e:
       logger.error("Error shutting down executor: %s", str(e))
+    except Exception as e:  # pylint: disable=broad-exception-caught
+      # Catch any other unexpected exceptions during shutdown
+      logger.error("Unexpected error shutting down executor: %s", str(e))
 
     logger.info("Command queue shutdown complete")
 
@@ -463,8 +471,12 @@ class CommandQueue:
         try:
           self._process_next_item()
           time.sleep(0.1)  # Small delay to prevent busy waiting
-        except Exception as e:
+        except (RuntimeError, ValueError, AttributeError, OSError) as e:
           logger.error("Error in queue worker: %s", str(e))
+          time.sleep(1)  # Longer delay on error
+        except Exception as e:  # pylint: disable=broad-exception-caught
+          # Worker thread must not die from unexpected exceptions
+          logger.error("Unexpected error in queue worker: %s", str(e))
           time.sleep(1)  # Longer delay on error
       logger.info("Command queue worker stopped")
 
@@ -496,9 +508,7 @@ class CommandQueue:
       execution_time = time.time() - start_time
 
       # Update result with execution time
-      result.execution_time = execution_time
-
-      # Set status based on result
+      result.execution_time = execution_time      # Set status based on result
       if result.success:
         item.status = CommandStatus.COMPLETED
       else:
@@ -510,11 +520,20 @@ class CommandQueue:
       logger.info("Completed %s in %.2fs (ID: %s)",
                   item.get_description(), execution_time, item.queue_id)
 
-    except Exception as e:
+    except (RuntimeError, ValueError, AttributeError, OSError) as e:
       logger.error("Error executing %s: %s", item.get_description(), str(e))
       error_result = ExecutionResult(
           success=False,
           error=str(e),
+          command_executed=str(item.command or item.command_block)
+      )
+      item.result = error_result
+    except Exception as e:  # pylint: disable=broad-exception-caught
+      # Ensure we always set a result, even for unexpected exceptions
+      logger.error("Unexpected error executing %s: %s", item.get_description(), str(e))
+      error_result = ExecutionResult(
+          success=False,
+          error=f"Unexpected error: {str(e)}",
           command_executed=str(item.command or item.command_block)
       )
       item.result = error_result
@@ -552,11 +571,19 @@ class CommandQueue:
           output=output,
           command_executed=command.command_text
       )
-    except Exception as e:
+    except OSError as e:
       logger.error("Command execution failed: %s", str(e))
       return ExecutionResult(
           success=False,
           error=str(e),
+          command_executed=command.command_text
+      )
+    except Exception as e:  # pylint: disable=broad-exception-caught
+      # Catch any other unexpected exceptions during command execution
+      logger.error("Unexpected error during command execution: %s", str(e))
+      return ExecutionResult(
+          success=False,
+          error=f"Unexpected error: {str(e)}",
           command_executed=command.command_text
       )
 
@@ -578,16 +605,26 @@ class CommandQueue:
               error=f"Command block timed out after {elapsed:.1f}s",
               output='\n'.join(all_outputs),
               command_executed=f"Block: {command_block.description}"
-          )
-
-        # Execute individual command
+          )        # Execute individual command
         output = self.command_executor(self.container_name, command.command_text, command.timeout)
         all_outputs.append(f"[{command.command_text}] {output}")
 
-      except Exception as e:
+      except (RuntimeError, ValueError, OSError) as e:
         error_msg = f"Command {i + 1} failed: {str(e)}"
         logger.error(error_msg)
         all_outputs.append(f"[{command.command_text}] ERROR: {str(e)}")
+
+        return ExecutionResult(
+            success=False,
+            error=error_msg,
+            output='\n'.join(all_outputs),
+            command_executed=f"Block: {command_block.description}"
+        )
+      except Exception as e:  # pylint: disable=broad-exception-caught
+        # Catch any other unexpected exceptions in command block execution
+        error_msg = f"Command {i + 1} unexpected error: {str(e)}"
+        logger.error(error_msg)
+        all_outputs.append(f"[{command.command_text}] UNEXPECTED ERROR: {str(e)}")
 
         return ExecutionResult(
             success=False,
@@ -613,8 +650,11 @@ class CommandQueue:
           break
 
         self._cleanup_completed_items()
-      except Exception as e:
+      except (RuntimeError, OSError) as e:
         logger.error("Error in cleanup worker: %s", str(e))
+      except Exception as e:  # pylint: disable=broad-exception-caught
+        # Cleanup worker must not die from unexpected exceptions
+        logger.error("Unexpected error in cleanup worker: %s", str(e))
 
     logger.info("Cleanup worker stopped")
 
