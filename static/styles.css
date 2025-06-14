@@ -501,6 +501,10 @@ button {
   /* Hidden by default */
 }
 
+.config-section.visible {
+  display: block;
+}
+
 .config-header {
   display: flex;
   justify-content: space-between;

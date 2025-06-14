@@ -1142,12 +1142,23 @@ function clearDeniedFriendRequests() {
 
 async function loadConfig() {
   try {
-    const response = await fetch('/config');
+    const response = await fetch(`http://${window.location.hostname}:8000/api/headless/config`);
     const config = await response.text();
 
+    // Parse and format the JSON for pretty printing
+    let formattedConfig;
+    try {
+      const parsed = JSON.parse(config);
+      formattedConfig = JSON.stringify(parsed, null, 2);
+    } catch (parseError) {
+      // If JSON parsing fails, use the raw config and log the error
+      console.warn('Failed to parse config JSON for formatting:', parseError);
+      formattedConfig = config;
+    }
+
     const configEditor = document.getElementById('config-editor');
-    configEditor.value = config;
-    currentConfig = config;
+    configEditor.value = formattedConfig;
+    currentConfig = formattedConfig;
     configChanged = false;
 
     updateLineNumbers();
@@ -1178,7 +1189,7 @@ async function saveConfig() {
   try {
     showLoadingOverlay('Saving configuration...');
 
-    const response = await fetch('/config', {
+    const response = await fetch(`http://${window.location.hostname}:8000/api/headless/config`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

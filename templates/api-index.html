@@ -924,11 +924,6 @@
                     "example": "config data",
                     "note": "Failed to load current config. Please edit with actual configuration."
                 }, null, 2);
-            } else if (path === '/config') {
-                return JSON.stringify({
-                    configProperty: "value",
-                    anotherProperty: "anotherValue"
-                }, null, 2);
             }
             return '{}';        }function formatJsonResponse(text) {
             try {
