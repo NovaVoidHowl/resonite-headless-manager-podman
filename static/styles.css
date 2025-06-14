@@ -405,6 +405,10 @@ button {
   /* Hidden by default */
 }
 
+.console-section.visible {
+  display: block;
+}
+
 .toggle-console {
   display: flex;
   align-items: center;
