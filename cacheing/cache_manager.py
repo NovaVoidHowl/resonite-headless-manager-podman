@@ -545,9 +545,7 @@ class CacheManager:
   def _evict_oldest_entry(self) -> None:
     """Remove the oldest cache entry to make room for new ones."""
     if not self._cache:
-      return
-
-    # Find the oldest entry by timestamp
+      return    # Find the oldest entry by timestamp
     oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k].timestamp)
     del self._cache[oldest_key]
     logger.debug("Evicted oldest cache entry: %s", oldest_key)
@@ -562,8 +560,11 @@ class CacheManager:
         if not self._shutdown_requested:
           try:
             self.cleanup()
-          except Exception as e:
+          except (RuntimeError, KeyError, ValueError, AttributeError) as e:
             logger.error("Error during cache cleanup: %s", str(e))
+          except Exception as e:  # pylint: disable=broad-exception-caught
+            # Catch any other unexpected exceptions to prevent cleanup thread from dying
+            logger.error("Unexpected error during cache cleanup: %s", str(e))
 
       logger.info("Cache cleanup thread stopped")
 
