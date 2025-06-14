@@ -183,7 +183,9 @@ function connect() {
     if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
       wsCommand.send(JSON.stringify({
         type: 'command',
-        command: 'friendRequests'
+        command: 'friendRequests',
+        target_world_instance: "0",
+        command_mode: "direct"
       }));
     }
   }, friendRequestsInterval);
@@ -193,7 +195,9 @@ function connect() {
     if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
       wsCommand.send(JSON.stringify({
         type: 'command',
-        command: 'listbans'
+        command: 'listbans',
+        target_world_instance: "0",
+        command_mode: "direct"
       }));
     }
   }, bannedUsersInterval);
@@ -293,7 +297,9 @@ function sendCommand() {
   if (command && wsCommand && wsCommand.readyState === WebSocket.OPEN) {
     wsCommand.send(JSON.stringify({
       type: 'command',
-      command: command
+      command: command,
+      target_world_instance: "0",
+      command_mode: "direct"
     }));
     appendOutput(`${command}`, 'command-line');
     commandInput.value = '';
@@ -769,7 +775,9 @@ function refreshWorldUsersList(worldIndex) {
   if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
     wsCommand.send(JSON.stringify({
       type: 'command',
-      command: 'users'
+      command: 'users',
+      target_world_instance: `${selectedWorldIndex}`,
+      command_mode: "default"
     }));
   }
 }
@@ -859,11 +867,12 @@ function sendWorldCommand(command) {
     showError('No session ID found for selected world');
     return;
   }
-
   if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
     wsCommand.send(JSON.stringify({
       type: 'command',
-      command: `${command} ${sessionId}`
+      command: `${command} ${sessionId}`,
+      target_world_instance: `${selectedWorldIndex}`,
+      command_mode: "default"
     }));
 
     showLoadingOverlay(`Executing ${command} command...`);
@@ -999,10 +1008,17 @@ function cancelWorldProperties() {
 // User Management Functions
 
 function changeUserRole(username, newRole) {
+  if (selectedWorldIndex === null) {
+    showError('No world selected');
+    return;
+  }
+
   if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
     wsCommand.send(JSON.stringify({
       type: 'command',
-      command: `role "${username}" ${newRole}`
+      command: `role "${username}" ${newRole}`,
+      target_world_instance: `${selectedWorldIndex}`,
+      command_mode: "default"
     }));
 
     showLoadingOverlay(`Changing ${username}'s role to ${newRole}...`);
@@ -1011,17 +1027,26 @@ function changeUserRole(username, newRole) {
 }
 
 function kickUser(username) {
+  if (selectedWorldIndex === null) {
+    showError('No world selected');
+    return;
+  }
+
   if (confirm(`Are you sure you want to kick ${username}?`)) {
     if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
       wsCommand.send(JSON.stringify({
         type: 'command',
-        command: `kick "${username}"`
+        command: `kick "${username}"`,
+        target_world_instance: `${selectedWorldIndex}`,
+        command_mode: "default"
       }));
 
       showLoadingOverlay(`Kicking ${username}...`);
       setTimeout(() => {
         hideLoadingOverlay();
-        refreshUsersList();
+        if (selectedWorldIndex !== null) {
+          refreshWorldUsersList(selectedWorldIndex);
+        }
       }, 2000);
     }
   }
@@ -1041,7 +1066,9 @@ function banUser(username) {
     if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
       wsCommand.send(JSON.stringify({
         type: 'command',
-        command: `ban "${username}"`
+        command: `ban "${username}"`,
+        target_world_instance: "0",
+        command_mode: "direct"
       }));
 
       showLoadingOverlay(`Banning ${username}...`);
@@ -1055,10 +1082,14 @@ function banUser(username) {
       setTimeout(() => {
         hideLoadingOverlay();
         // Refresh both users and bans list
-        refreshUsersList();
+        if (selectedWorldIndex !== null) {
+          refreshWorldUsersList(selectedWorldIndex);
+        }
         wsCommand.send(JSON.stringify({
           type: 'command',
-          command: 'listbans'
+          command: 'listbans',
+          target_world_instance: "0",
+          command_mode: "direct"
         }));
       }, 2000);
     }
@@ -1070,7 +1101,9 @@ function unbanUser(username) {
     if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
       wsCommand.send(JSON.stringify({
         type: 'command',
-        command: `unban "${username}"`
+        command: `unban "${username}"`,
+        target_world_instance: "0",
+        command_mode: "direct"
       }));
 
       showLoadingOverlay(`Unbanning ${username}...`);
@@ -1079,7 +1112,9 @@ function unbanUser(username) {
         // Refresh bans list
         wsCommand.send(JSON.stringify({
           type: 'command',
-          command: 'listbans'
+          command: 'listbans',
+          target_world_instance: "0",
+          command_mode: "direct"
         }));
       }, 2000);
     }
@@ -1092,7 +1127,9 @@ function acceptFriendRequest(requestId) {
   if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
     wsCommand.send(JSON.stringify({
       type: 'command',
-      command: `acceptFriendRequest "${requestId}"`
+      command: `acceptFriendRequest "${requestId}"`,
+      target_world_instance: "0",
+      command_mode: "direct"
     }));
 
     showLoadingOverlay('Accepting friend request...');
@@ -1101,7 +1138,9 @@ function acceptFriendRequest(requestId) {
       // Refresh friend requests
       wsCommand.send(JSON.stringify({
         type: 'command',
-        command: 'friendRequests'
+        command: 'friendRequests',
+        target_world_instance: "0",
+        command_mode: "direct"
       }));
     }, 2000);
   }
@@ -1133,7 +1172,9 @@ function clearDeniedFriendRequests() {
   if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
     wsCommand.send(JSON.stringify({
       type: 'command',
-      command: 'friendRequests'
+      command: 'friendRequests',
+      target_world_instance: "0",
+      command_mode: "direct"
     }));
   }
 }
@@ -1280,7 +1321,9 @@ function updateFriendRequestsInterval() {
       if (wsCommand && wsCommand.readyState === WebSocket.OPEN) {
         wsCommand.send(JSON.stringify({
           type: 'command',
-          command: 'friendRequests'
+          command: 'friendRequests',
+          target_world_instance: "0",
+          command_mode: "direct"
         }));
       }
     }, friendRequestsInterval);
