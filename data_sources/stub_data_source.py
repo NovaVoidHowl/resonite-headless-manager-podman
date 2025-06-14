@@ -61,98 +61,330 @@ class StubDataSource(BaseDataSource):
         "[1]   Username: TrollUser456  UserID: U-troll456  MachineIds: b67d23f456a789c123e4",
         "[2]   Username: HackerUser789  UserID: U-hacker789  MachineIds: c89d45f678b012d345f6"
     ]
-    self.friend_requests = ["NewUser789", "AnotherUser321"]
-
-    # info on global commands
+    self.friend_requests = ["NewUser789", "AnotherUser321"]    # info on global commands
     self.native_headless_global_commands = [
-      {"saveConfig": "Saves the current settings into the original config file"},
-      {"login": "Login to an account - requires username and password"},
-      {"logout": "Logout from the current account"},
-      {"message": "Message user in friends list - requires username and message"},
-      {"friendRequests": "Get list of friend requests"},
-      {"acceptFriendRequest": "Accept a friend request - requires username"},
-      {"worlds": "Lists all active worlds"},
-      {"focus": "Focus on a specific world - requires world world name or number"},
-      {"startWorldURL": "Start a world by URL - requires world URL"},
-      {"startWorldTemplate": "Start a world by template - requires template name"},
-      {"ban": "Bans the user from all sessions hosted by server - requires username"},
-      {"unban": "Unbans the user from all sessions hosted by server - requires username"},
-      {"listbans": "Lists all active bans"},
-      {"banByName": "Bans the user by name from all sessions hosted by server - requires username"},
-      {"unbanByName": "Unbans the user by name from all sessions hosted by server - requires username"},
-      {"banByID": "Bans the user by ID from all sessions hosted by server - requires user ID"},
-      {"unbanByID": "Unbans the user by ID from all sessions hosted by server - requires user ID"},
-      {"gc": "Forces full garbage collection"},
-      {"debugWorldState": "Prints out diagnostic information for all worlds which can be used for debugging purposes"},
-      {"shutdown": "Shuts down the headless client - note if in container this will NOT stop the container"},
-      {"tickRate": "Sets the maximum simulation rate for the servers - requires rate in seconds"},
-      {"log": (
-        "Switches the interactive shell to logging output. Press enter again to restore interactive shell. "
-        "- Should not be used, reject command"
-      )},
+      {
+        "command": "saveConfig",
+        "description": "Saves the current settings into the original config file",
+        "supported": True,
+        "parameters": []
+      },
+      {
+        "command": "login",
+        "description": "Login to an account - requires username and password",
+        "supported": False,
+        "parameters": ["username", "password"]
+      },
+      {
+        "command": "logout",
+        "description": "Logout from the current account",
+        "supported": False,
+        "parameters": []
+      },
+      {
+        "command": "message",
+        "description": "Message user in friends list - requires username and message",
+        "supported": True,
+        "parameters": ["username", "message"]
+      },
+      {
+        "command": "friendRequests",
+        "description": "Get list of friend requests",
+        "supported": True,
+        "parameters": []
+      },
+      {
+        "command": "acceptFriendRequest",
+        "description": "Accept a friend request - requires username",
+        "supported": True,
+        "parameters": ["username"]
+      },
+      {
+        "command": "worlds",
+        "description": "Lists all active worlds",
+        "supported": True,
+        "parameters": []
+      },
+      {
+        "command": "focus",
+        "description": "Focus on a specific world - requires world name or number",
+        "supported": True,
+        "parameters": ["world_identifier"]
+      },
+      {
+        "command": "startWorldURL",
+        "description": "Start a world by URL - requires world URL",
+        "supported": True,
+        "parameters": ["world_url"]
+      },
+      {
+        "command": "startWorldTemplate",
+        "description": "Start a world by template - requires template name",
+        "supported": True,
+        "parameters": ["template_name"]
+      },
+      {
+        "command": "ban",
+        "description": "Bans the user from all sessions hosted by server - requires username",
+        "supported": True,
+        "parameters": ["username"]
+      },
+      {
+        "command": "unban",
+        "description": "Unbans the user from all sessions hosted by server - requires username",
+        "supported": True,
+        "parameters": ["username"]
+      },
+      {
+        "command": "listbans",
+        "description": "Lists all active bans",
+        "supported": True,
+        "parameters": []
+      },
+      {
+        "command": "banByName",
+        "description": "Bans the user by name from all sessions hosted by server - requires username",
+        "supported": True,
+        "parameters": ["username"]
+      },
+      {
+        "command": "unbanByName",
+        "description": "Unbans the user by name from all sessions hosted by server - requires username",
+        "supported": True,
+        "parameters": ["username"]
+      },
+      {
+        "command": "banByID",
+        "description": "Bans the user by ID from all sessions hosted by server - requires user ID",
+        "supported": True,
+        "parameters": ["user_id"]
+      },
+      {
+        "command": "unbanByID",
+        "description": "Unbans the user by ID from all sessions hosted by server - requires user ID",
+        "supported": True,
+        "parameters": ["user_id"]
+      },
+      {
+        "command": "gc",
+        "description": "Forces full garbage collection",
+        "supported": True,
+        "parameters": []
+      },
+      {
+        "command": "debugWorldState",
+        "description": "Prints out diagnostic information for all worlds which can be used for debugging purposes",
+        "supported": True,
+        "parameters": []
+      },
+      {
+        "command": "shutdown",
+        "description": "Shuts down the headless client - note if in container this will NOT stop the container",
+        "supported": False,
+        "parameters": [],
+        "notes": "This command should not be allowed as it stops the server but leaves the container running."
+      },
+      {
+        "command": "tickRate",
+        "description": "Sets the maximum simulation rate for the servers - requires rate in seconds",
+        "supported": True,
+        "parameters": ["rate_seconds"]
+      },
+      {
+        "command": "log",
+        "description": ("Switches the interactive shell to logging output. Press enter again to restore "
+                        "interactive shell. - Should not be used, reject command"),
+        "supported": False,
+        "parameters": []
+      },
     ]
+
     self.native_headless_world_specific_commands = [
-      {"invite": "Invite user to a world - requires username (must be in friends list)"},
-      {"status": "Get status of the current world"},
-      {"sessionUrl": "Get session URL of the current world"},
-      {"sessionID": "Get session ID of the current world"},
-      {"copySessionURL": "Copy session URL to clipboard - NOT SUPPORTED"},
-      {"copySessionID": "Copy session ID to clipboard - NOT SUPPORTED"},
-      {"users": "Get list of users in the current world"},
-      {"close": "Close the current world"},
-      {"save": "Save the current world"},
-      {"restart": "Restart the current world"},
-      {"kick": "Kick a user from the current world - requires username"},
-      {"silence": "Silence a user in the current world - requires username"},
-      {"unsilence": "Unsilence a user in the current world - requires username"},
-      {"respawn": "Respawn a user in the current world - requires username"},
-      {"name": "Change the name of the current world - requires new name"},
-      {"accessLevel": "Change the access level of the current world - requires new access level"},
-      {"hideFromListing": "Hide the current world from public listing - requires boolean value"},
-      {"description": "Change the description of the current world - requires new description"},
       {
-        "maxUsers": (
-          "Change the maximum number of users in the current world - "
-          "requires new max users"
-        )
-      },
-      {"awayKickInterval": "Sets the away kick interval for the current world - requires minutes"},
-      {"import": "Import an asset into the focused world - requires asset URL or path"},
-      {
-        "importMinecraft": (
-          "Import a Minecraft world. Requires Mineways to be installed. - folder containing Minecraft "
-          "world with the level.dat file - NOT SUPPORTED"
-        )
-      },
-      {"dynamicImpulse": "Sends a dynamic impulse with given tag to the scene root - requires tag"},
-      {
-        "dynamicImpulseString": (
-          "Sends a dynamic impulse with given tag and string value to the scene root - "
-          "requires tag and string value"
-        )
+        "command": "invite",
+        "description": "Invite user to a world - requires username (must be in friends list)",
+        "supported": True,
+        "parameters": ["username"]
       },
       {
-        "dynamicImpulseInt": (
-          "Sends a dynamic impulse with given tag and integer value to the scene root - "
-          "requires tag and integer value"
-        )
+        "command": "status",
+        "description": "Get status of the current world",
+        "supported": True,
+        "parameters": []
       },
       {
-        "dynamicImpulseFloat": (
-          "Sends a dynamic impulse with given tag and float value to the scene root - "
-          "requires tag and float value"
-        )
+        "command": "sessionUrl",
+        "description": "Get session URL of the current world",
+        "supported": True,
+        "parameters": []
       },
       {
-        "spawn": (
-          "Spawns an item from a record URL into the world's root - "
-          "requires url, state (bool), persistence (bool)"
-        )
+        "command": "sessionID",
+        "description": "Get session ID of the current world",
+        "supported": True,
+        "parameters": []
+      },
+      {
+        "command": "copySessionURL",
+        "description": "Copy session URL to clipboard",
+        "supported": False,
+        "parameters": [],
+        "notes": "No point in supporting this command as there is no clipboard for it to go to."
+      },
+      {
+        "command": "copySessionID",
+        "description": "Copy session ID to clipboard",
+        "supported": False,
+        "parameters": [],
+        "notes": "No point in supporting this command as there is no clipboard for it to go to."
+      },
+      {
+        "command": "users",
+        "description": "Get list of users in the current world",
+        "supported": True,
+        "parameters": []
+      },
+      {
+        "command": "close",
+        "description": "Close the current world",
+        "supported": True,
+        "parameters": []
+      },
+      {
+        "command": "save",
+        "description": "Save the current world",
+        "supported": True,
+        "parameters": []
+      },
+      {
+        "command": "restart",
+        "description": "Restart the current world",
+        "supported": True,
+        "parameters": []
+      },
+      {
+        "command": "kick",
+        "description": "Kick a user from the current world - requires username",
+        "supported": True,
+        "parameters": ["username"]
+      },
+      {
+        "command": "silence",
+        "description": "Silence a user in the current world - requires username",
+        "supported": True,
+        "parameters": ["username"]
+      },
+      {
+        "command": "unsilence",
+        "description": "Unsilence a user in the current world - requires username",
+        "supported": True,
+        "parameters": ["username"]
+      },
+      {
+        "command": "respawn",
+        "description": "Respawn a user in the current world - requires username",
+        "supported": True,
+        "parameters": ["username"]
+      },
+      {
+        "command": "role",
+        "description": "Set the role of a user in the current world - requires username and role",
+        "supported": True,
+        "parameters": ["username", "role"]
+      },
+      {
+        "command": "name",
+        "description": "Change the name of the current world - requires new name",
+        "supported": True,
+        "parameters": ["new_name"]
+      },
+      {
+        "command": "accessLevel",
+        "description": "Change the access level of the current world - requires new access level",
+        "supported": True,
+        "parameters": ["access_level"]
+      },
+      {
+        "command": "hideFromListing",
+        "description": "Hide the current world from public listing - requires boolean value",
+        "supported": True,
+        "parameters": ["hide_boolean"]
+      },
+      {
+        "command": "description",
+        "description": "Change the description of the current world - requires new description",
+        "supported": True,
+        "parameters": ["new_description"]
+      },
+      {
+        "command": "maxUsers",
+        "description": "Change the maximum number of users in the current world - requires new max users",
+        "supported": True,
+        "parameters": ["max_users"]
+      },
+      {
+        "command": "awayKickInterval",
+        "description": "Sets the away kick interval for the current world - requires minutes",
+        "supported": True,
+        "parameters": ["minutes"]
+      },
+      {
+        "command": "import",
+        "description": "Import an asset into the focused world - requires asset URL or path",
+        "supported": True,
+        "parameters": ["asset_url_or_path"]
+      },
+      {
+        "command": "importMinecraft",
+        "description": ("Import a Minecraft world. Requires Mineways to be installed + a folder containing "
+                        "Minecraft world with the level.dat file"),
+        "supported": False,
+        "parameters": ["minecraft_world_folder"],
+        "notes": "Not supported in this stub"
+      },
+      {
+        "command": "dynamicImpulse",
+        "description": "Sends a dynamic impulse with given tag to the scene root - requires tag",
+        "supported": True,
+        "parameters": ["tag"]
+      },
+      {
+        "command": "dynamicImpulseString",
+        "description": ("Sends a dynamic impulse with given tag and string value to the scene root - "
+                        "requires tag and string value"),
+        "supported": True,
+        "parameters": ["tag", "string_value"]
+      },
+      {
+        "command": "dynamicImpulseInt",
+        "description": ("Sends a dynamic impulse with given tag and integer value to the scene root - "
+                        "requires tag and integer value"),
+        "supported": True,
+        "parameters": ["tag", "integer_value"]
+      },
+      {
+        "command": "dynamicImpulseFloat",
+        "description": ("Sends a dynamic impulse with given tag and float value to the scene root - "
+                        "requires tag and float value"),
+        "supported": True,
+        "parameters": ["tag", "float_value"]
+      },
+      {
+        "command": "spawn",
+        "description": ("Spawns an item from a record URL into the world's root - "
+                        "requires url, state (bool), persistence (bool)"),
+        "supported": True,
+        "parameters": ["url", "state", "persistence"]
       },
     ]
 
     self.custom_global_commands = [
-      {"server_status": "global info command - custom command merging worlds and server status"}
+      {
+        "command": "server_status",
+        "description": "global info command - custom command merging worlds and server status",
+        "supported": True,
+        "parameters": []
+      }
     ]
     self.custom_world_specific_commands = [
     ]
@@ -275,26 +507,22 @@ class StubDataSource(BaseDataSource):
         - base_command: The base command without parameters
     """
     # Extract the base command (first word)
-    base_command = command.split()[0] if command.strip() else ""
-
-    # Check global commands
+    base_command = command.split()[0] if command.strip() else ""    # Check global commands
     for cmd_dict in self.native_headless_global_commands:
-      if base_command in cmd_dict:
+      if base_command == cmd_dict.get("command"):
         return True, "global", base_command
 
     # Check world-specific commands
     for cmd_dict in self.native_headless_world_specific_commands:
-      if base_command in cmd_dict:
+      if base_command == cmd_dict.get("command"):
         return True, "world_specific", base_command
 
     # Check custom global commands
     for cmd_dict in self.custom_global_commands:
-      if base_command in cmd_dict:
-        return True, "custom_global", base_command
-
-    # Check custom world-specific commands
+      if base_command == cmd_dict.get("command"):
+        return True, "custom_global", base_command    # Check custom world-specific commands
     for cmd_dict in self.custom_world_specific_commands:
-      if base_command in cmd_dict:
+      if base_command == cmd_dict.get("command"):
         return True, "custom_world_specific", base_command
 
     return False, "unknown", base_command
@@ -382,6 +610,83 @@ class StubDataSource(BaseDataSource):
           "type": "command_response",
           "command": command,
           "output": self.get_server_status(),
+          "timestamp": current_timestamp
+        }
+      elif command.startswith("role"):  # specific to a world - has parameters
+        # Extract parameters from command
+        parts = command.split()
+        if len(parts) < 3:
+          return {
+            "type": "error",
+            "command": command,
+            "message": "Invalid role command format. Use: role <username> <role>",
+            "timestamp": current_timestamp
+          }
+        username = parts[1]
+        role = parts[2]  # e.g., "role user123 Moderator"
+        # Simulate setting the role
+        logger.info("Setting role for user '%s' to '%s'", username, role)
+        return {
+          "type": "command_response",
+          "command": command,
+          "output": f"Role set to '{role}' for user '{username}'",
+          "timestamp": current_timestamp
+        }
+      elif command.startswith("kick"):  # specific to a world - has parameters
+        # Extract parameters from command
+        parts = command.split()
+        if len(parts) < 2:
+          return {
+            "type": "error",
+            "command": command,
+            "message": "Invalid kick command format. Use: kick <username>",
+            "timestamp": current_timestamp
+          }
+        username = parts[1]
+        # Simulate kicking the user
+        logger.info("Kicking user '%s' from world '%s'", username, target_world_instance)
+        return {
+          "type": "command_response",
+          "command": command,
+          "output": f"kicked user '{username}'",
+          "timestamp": current_timestamp
+        }
+      elif command.startswith("ban"):  # # global command - has parameters
+        # Extract parameters from command
+        parts = command.split()
+        if len(parts) < 2:
+          return {
+            "type": "error",
+            "command": command,
+            "message": "Invalid ban command format. Use: ban <username>",
+            "timestamp": current_timestamp
+          }
+        username = parts[1]
+        # Simulate banning the user
+        logger.info("Banning user '%s' from host", username)
+        return {
+          "type": "command_response",
+          "command": command,
+          "output": f"banned user '{username}' from host",
+          "timestamp": current_timestamp
+        }
+      elif command.startswith("unban"):  # # global command - has parameters
+        # Extract parameters from command
+        parts = command.split()
+        if len(parts) < 2:
+          return {
+            "type": "error",
+            "command": command,
+            "message": "Invalid unban command format. Use: ban <username>",
+            "timestamp": current_timestamp
+          }
+        username = parts[1]
+        # Simulate banning the user
+        logger.info("Un-banning user '%s' from host", username)
+        return {
+          "type": "command_response",
+          "command": command,
+          "output": f"Un-banned user '{username}' from host",
           "timestamp": current_timestamp
         }
       else:
@@ -648,3 +953,34 @@ class StubDataSource(BaseDataSource):
         "container_name": self.container_name,
         "test_mode": True
     }
+
+  def get_command_info(self) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Get structured command information for all command categories.
+
+    Returns:
+        Dictionary containing command information organized by category
+    """
+    return {
+      "native_headless_global_commands": self.native_headless_global_commands,
+      "native_headless_world_specific_commands": self.native_headless_world_specific_commands,
+      "custom_global_commands": self.custom_global_commands,
+      "custom_world_specific_commands": self.custom_world_specific_commands
+    }
+
+  def get_supported_commands(self) -> Dict[str, List[str]]:
+    """
+    Get list of supported command names organized by category.
+      Returns:
+        Dictionary containing lists of supported command names by category
+    """
+    result = {}
+
+    # Get supported commands from each category
+    for category, commands in self.get_command_info().items():
+      result[category] = [
+        cmd["command"] for cmd in commands
+        if cmd.get("supported", True)  # Default to True if not specified
+      ]
+
+    return result

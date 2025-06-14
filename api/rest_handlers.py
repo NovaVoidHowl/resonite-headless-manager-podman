@@ -198,6 +198,26 @@ async def _generate_config_handler(data_source):
     raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+async def _get_command_info_handler(data_source):
+  """Get available command information from the data source"""
+  try:
+    result = data_source.get_command_info()
+    return JSONResponse(content=result)
+  except Exception as e:
+    logger.error("Error in get_command_info endpoint: %s", str(e))
+    raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+async def _get_supported_commands_handler(data_source):
+  """Get list of supported commands from the data source"""
+  try:
+    result = data_source.get_supported_commands()
+    return JSONResponse(content=result)
+  except Exception as e:
+    logger.error("Error in get_supported_commands endpoint: %s", str(e))
+    raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 def create_rest_endpoints(app, data_source, templates_path="templates"):
   """
   Create all REST API endpoints for the FastAPI app
@@ -310,3 +330,25 @@ def create_rest_endpoints(app, data_source, templates_path="templates"):
             })
   async def generate_config():
     return await _generate_config_handler(data_source)
+
+  @app.get("/api/commands/info",
+           summary="Get Command Information",
+           description="Retrieve detailed information about all available commands",
+           tags=["Commands"],
+           responses={
+               200: {"description": "Command information retrieved successfully"},
+               500: {"description": "Error retrieving command information"}
+           })
+  async def get_command_info():
+    return await _get_command_info_handler(data_source)
+
+  @app.get("/api/commands/supported",
+           summary="Get Supported Commands",
+           description="Retrieve list of supported command names organized by category",
+           tags=["Commands"],
+           responses={
+               200: {"description": "Supported commands retrieved successfully"},
+               500: {"description": "Error retrieving supported commands"}
+           })
+  async def get_supported_commands():
+    return await _get_supported_commands_handler(data_source)
