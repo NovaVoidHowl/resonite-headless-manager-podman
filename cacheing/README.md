@@ -617,16 +617,16 @@ print(f"Max entries: {cache.max_entries}")
 print(f"Cleanup interval: {cache.cleanup_interval}")
 ```
 
-## Running the Examples
+## Running the Tests
 
-A complete working example is provided in `example_usage.py`. Run it with:
+Comprehensive test examples are provided in the tests directory at `_tests/test_cache-manager/test.py`. Run them with:
 
 ```bash
-cd cacheing
-python example_usage.py
+cd _tests/test_cache-manager
+python test.py
 ```
 
-This example demonstrates:
+These tests demonstrate:
 
 - Basic cache operations (set, get, delete)
 - Data freshness and TTL handling
@@ -636,32 +636,30 @@ This example demonstrates:
 - Async-compatible usage patterns
 - Cleanup and memory management
 - Error handling scenarios
+- Thread safety validation
+- Performance characteristics
 
-### Example Output
+### Test Output
 
-The example will show output similar to:
+The test suite will show output similar to:
 
 ```text
-Cache Manager Examples
-==================================================
-=== Basic Cache Usage ===
-Data cached successfully: True
-Retrieved data: {'users': [{'name': 'Alice', 'id': 'U-alice123'},
-                 {'name': 'Bob', 'id': 'U-bob456'}], 'total_count': 2}
-Data age: 0.0 seconds
-TTL remaining: 30.0 seconds
-Access count: 1
-Category: resonite_data
-Metadata: {'source_command': 'users', 'world': 'main'}
-User count from cache: 2
+Cache Manager Comprehensive Test Suite
+============================================================
+=== Basic Operations Test ===
+✓ Data storage successful
+✓ Data retrieval successful
+✓ Key existence checks successful
+✓ Convenience method works
+✓ Data deletion successful
+✓ Invalid operations properly rejected
 
-=== Data Freshness Example ===
-Fresh data: {'value': 42} (status: fresh)
-Waiting 2 seconds...
-Still fresh: {'value': 42} (age: 2.0s)
-Waiting 2 more seconds...
-Fresh data available: False
-Stale data: {'value': 42} (status: stale, age: 4.0s)
+=== TTL and Freshness Test ===
+✓ Fresh data retrieval works
+✓ Stale data handling works
+✓ Fresh-only retrieval works
+✓ Expired data handling works
+✓ TTL calculations work
 ```
 
 ## Cache Manager Implementation Details
