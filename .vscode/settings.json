@@ -48,6 +48,7 @@
     "pyproject",
     "PYTHONIOENCODING",
     "Pyvenv",
+    "recognised",
     "redoc",
     "Resonite",
     "respawn",
