@@ -17,7 +17,7 @@ from typing import Any, Dict, List
 
 # Import the base interface (sys.path modification required first)
 sys.path.append(str(Path(__file__).parent.parent))
-from base_interface import ExternalSystemInterface  # noqa: E402 # pylint: disable=wrong-import-position
+from base_interface import ExternalSystemInterface  # noqa: E402 pylint: disable=wrong-import-position,import-error
 
 # Configure logging
 logger = logging.getLogger(__name__)

@@ -17,12 +17,12 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import docker
-from docker import errors as docker_errors
+import docker  # type: ignore # pylint: disable=import-error
+from docker import errors as docker_errors  # type: ignore # pylint: disable=import-error
 
 # Import the base interface
 sys.path.append(str(Path(__file__).parent.parent))
-from base_interface import ExternalSystemInterface  # noqa: E402 # pylint: disable=wrong-import-position
+from base_interface import ExternalSystemInterface  # noqa: E402 pylint: disable=wrong-import-position,import-error
 
 # Configure logging
 logger = logging.getLogger(__name__)
