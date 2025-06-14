@@ -527,6 +527,36 @@ class StubDataSource(BaseDataSource):
 
     return False, "unknown", base_command
 
+  def _is_supported_command(self, command: str) -> bool:
+    """
+    Check if a command is supported in the stub data source.
+
+    Args:
+        command: The full command string (e.g., "focus 0" or "ban user123")
+
+    Returns:
+        bool: True if the command is supported, False otherwise
+    """
+    is_valid, command_type, base_command = self._is_valid_command(command)
+    if not is_valid:
+      return False
+
+    # Check if the command is supported in the respective command list
+    if command_type == "global":
+      return any(cmd_dict.get("command") == base_command and cmd_dict.get("supported", False)
+                 for cmd_dict in self.native_headless_global_commands)
+    elif command_type == "world_specific":
+      return any(cmd_dict.get("command") == base_command and cmd_dict.get("supported", False)
+                 for cmd_dict in self.native_headless_world_specific_commands)
+    elif command_type == "custom_global":
+      return any(cmd_dict.get("command") == base_command and cmd_dict.get("supported", False)
+                 for cmd_dict in self.custom_global_commands)
+    elif command_type == "custom_world_specific":
+      return any(cmd_dict.get("command") == base_command and cmd_dict.get("supported", False)
+                 for cmd_dict in self.custom_world_specific_commands)
+
+    return False
+
   def get_structured_command_response(self, command: str, target_world_instance: str,
                                       command_mode: str, _timeout: int = 10) -> Dict[str, Any]:
     """Get a structured response for a command with appropriate formatting and type."""
@@ -546,13 +576,24 @@ class StubDataSource(BaseDataSource):
 
       # direct commands do not have structured responses, just return the output
       # this is more intended for use on the console,
-      # We return a base64 encoded blob of the output (to guard against odd characters)
+      # We return a hex encoded blob of the output (to guard against odd characters)
 
-      # for this stub we create a random string of 20 characters then base64 encode it
-      output = ''.join(random.choices('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=20))
-      output = output.encode('utf-8').hex()  # Simulate base64 encoding
+      output = ""  # empty output by default
+      # first check if the command
+      if not self._is_supported_command(command):
+        # ok its not supported, return an error (note message should be in the format of a command response,
+        #  inc the encoding)
+        logger.warning("Command '%s' is not supported in direct mode", command)
+        # base64 encode the error message
+        output = f"Command '{command}' is not supported in direct mode".encode('utf-8').hex()
+      else:
+        # we now need an output from the command, this is a stub so we will just simulate it
+        output = "Command executed successfully".encode('utf-8').hex()
+
       # Return structured response for direct command
-      logger.info("Direct command output: %s", output)
+      logger.info("Direct command output (encoded): %s", output)
+      # log decoded output
+      logger.info("Decoded direct command output: %s", bytes.fromhex(output).decode('utf-8'))
 
       return {
         "type": "command_response",
@@ -582,6 +623,15 @@ class StubDataSource(BaseDataSource):
 
       # Log the command type for debugging
       logger.info("Command '%s' recognized as %s command", base_command, command_type)
+
+      # check if command is supported (supported = true in the command list)
+      if not self._is_supported_command(command):
+        return {
+          "type": "error",
+          "command": command,
+          "message": f"Command '{base_command}' recognised but is not supported in this implementation",
+          "timestamp": current_timestamp
+        }
 
       # Handle special commands that need structured responses
       if command == "listbans":  # global info command
