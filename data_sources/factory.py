@@ -10,8 +10,8 @@ import os
 import sys
 from typing import Any, Dict, Optional, List
 
-from .base_data_source import BaseDataSource
-from .stub_data_source import StubDataSource
+from .base_data_source import BaseDataSource  # noqa: E402 pylint: disable=relative-beyond-top-level
+from .stub_data_source import StubDataSource  # noqa: E402 pylint: disable=relative-beyond-top-level
 
 logger = logging.getLogger(__name__)
 
