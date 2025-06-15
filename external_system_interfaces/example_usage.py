@@ -31,21 +31,19 @@ def example_basic_usage():
   stub = create_interface(interface_type="stub")
   print(f"   Stub interface: {type(stub).__name__}")
   stub.cleanup()
-
   # Would work if Podman is installed and configured
   try:
     podman = create_interface(interface_type="podman")
     print(f"   Podman interface: {type(podman).__name__}")
     podman.cleanup()
-  except Exception as e:
+  except (ImportError, ValueError, OSError, RuntimeError) as e:
     print(f"   Podman interface: Not available - {e}")
-
   # Would work if Docker is installed and configured
   try:
     docker = create_interface(interface_type="docker")
     print(f"   Docker interface: {type(docker).__name__}")
     docker.cleanup()
-  except Exception as e:
+  except (ImportError, ValueError, OSError, RuntimeError) as e:
     print(f"   Docker interface: Not available - {e}")
 
 
@@ -83,7 +81,6 @@ def example_config_based():
       "description": "Podman container management"
     }
   ]
-
   for config in configs:
     print(f"   Config: {config['description']}")
     try:
@@ -95,7 +92,7 @@ def example_config_based():
       print(f"     Test status: {status.get('status', 'N/A')}")
 
       interface.cleanup()
-    except Exception as e:
+    except (ImportError, ValueError, OSError, RuntimeError, AttributeError) as e:
       print(f"     Failed: {e}")
 
 
@@ -136,14 +133,13 @@ def example_json_config():
 
   print("   Example config.json:")
   print(f"   {json.dumps(json_config, indent=4)}")
-
   # Use the configuration
   interface_config = json_config["external_interface"]
   try:
     interface = ExternalSystemInterfaceFactory.create_from_config(interface_config)
     print(f"   Successfully created: {type(interface).__name__}")
     interface.cleanup()
-  except Exception as e:
+  except (ImportError, ValueError, OSError, RuntimeError, AttributeError) as e:
     print(f"   Failed to create interface: {e}")
 
 
