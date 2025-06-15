@@ -1,10 +1,13 @@
 """
-Test script demonstrating Command Queue integration with Stub Interface
+Test script demonstrating Command Queue integration with External System Interfaces
 
 This script shows how to use the command queue system in conjunction with the
-stub interface to test sequential command execution to a simulated Resonite
-headless container. The queue manages only execute_command operations, while
-other operations (start/stop/restart) are called directly on the interface.
+external system interface factory to test sequential command execution to a
+simulated Resonite headless container. The factory allows easy switching between
+different interface types (stub, podman, docker) through configuration.
+
+The queue manages only execute_command operations, while other operations
+(start/stop/restart) are called directly on the interface.
 """
 
 import asyncio
@@ -14,13 +17,12 @@ from pathlib import Path
 
 # Add the parent directories to the path to import modules
 project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root / "external_system_interfaces"))
-sys.path.insert(0, str(project_root / "external_system_interfaces" / "stub_interface"))
-sys.path.insert(0, str(project_root / "command_queue"))
+sys.path.insert(0, str(project_root))
 
 try:
-  from stub_interface import StubInterface  # pylint: disable=import-error
-  from command_queue import (  # pylint: disable=import-error
+  from external_system_interfaces.factory import create_interface  # pylint: disable=import-error
+  from external_system_interfaces.base_interface import ExternalSystemInterface  # pylint: disable=import-error
+  from command_queue.command_queue import (  # pylint: disable=import-error
       Command,
       CommandBlock,
       CommandQueue,
@@ -42,18 +44,18 @@ logger = logging.getLogger(__name__)
 
 class StubCommandExecutor:
   """
-  Wrapper that connects the command queue to the stub interface.
+  Wrapper that connects the command queue to external system interfaces.
 
-  This class adapts the stub interface's execute_command method to work
-  with the command queue system.
+  This class adapts any external system interface's execute_command method to work
+  with the command queue system. Works with stub, podman, docker, or any other
+  interface implementation.
   """
-
-  def __init__(self, stub_interface: StubInterface, instance_name: str):
+  def __init__(self, stub_interface: ExternalSystemInterface, instance_name: str):
     """
     Initialize the executor.
 
     Args:
-        stub_interface: The stub interface instance
+        stub_interface: The external system interface instance (stub, podman, docker, etc.)
         instance_name: Name of the instance to execute commands on
     """
     self.stub_interface = stub_interface
@@ -83,10 +85,8 @@ class StubCommandExecutor:
 
 async def test_basic_command_execution():
   """Test basic command execution through the queue."""
-  print("\n=== Basic Command Execution Test ===")
-
-  # Create stub interface and executor
-  stub = StubInterface()
+  print("\n=== Basic Command Execution Test ===")  # Create stub interface and executor
+  stub = create_interface(interface_type="stub")
   instance_name = "resonite-headless-test"
   executor = StubCommandExecutor(stub, instance_name)
 
@@ -132,7 +132,7 @@ async def test_command_blocks():
   """Test command blocks with related Resonite commands."""
   print("\n=== Command Blocks Test ===")
 
-  stub = StubInterface()
+  stub = create_interface(interface_type="stub")
   instance_name = "resonite-headless-test"
   executor = StubCommandExecutor(stub, instance_name)
 
@@ -203,7 +203,7 @@ async def test_mixed_priorities():
   """Test commands with different priorities."""
   print("\n=== Mixed Priorities Test ===")
 
-  stub = StubInterface()
+  stub = create_interface(interface_type="stub")
   instance_name = "resonite-headless-test"
   executor = StubCommandExecutor(stub, instance_name)
 
@@ -259,7 +259,7 @@ async def test_direct_interface_operations():
   """Test direct interface operations (not through queue)."""
   print("\n=== Direct Interface Operations Test ===")
 
-  stub = StubInterface()
+  stub = create_interface(interface_type="stub")
   instance_name = "resonite-headless-test"
 
   print("Testing direct interface operations (bypassing queue)...")
@@ -301,7 +301,7 @@ async def test_error_handling():
   """Test error handling in the queue system."""
   print("\n=== Error Handling Test ===")
 
-  stub = StubInterface()
+  stub = create_interface(interface_type="stub")
   instance_name = "resonite-headless-test"  # Create a custom executor that can simulate failures
 
   class FaultInjectionExecutor(StubCommandExecutor):
@@ -377,7 +377,7 @@ async def test_queue_monitoring():
   """Test queue status monitoring capabilities."""
   print("\n=== Queue Monitoring Test ===")
 
-  stub = StubInterface()
+  stub = create_interface(interface_type="stub")
   instance_name = "resonite-headless-test"
   executor = StubCommandExecutor(stub, instance_name)
 
